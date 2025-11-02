@@ -37,11 +37,15 @@ class Game:
 
     @property
     def grid(self) -> list:
-        return self.__grid
+        for row in self.__grid:
+            yield row
 
     @property
     def gameState(self) -> str:
         return self.__gameState
+
+    def getTimeLeft(self) -> float:
+        return time.time() - self.startTime
 
     def isGameOver(self) -> bool:
         if time.time() - self.startTime > self.gameDurationInSeconds or self.player.health <= 0:

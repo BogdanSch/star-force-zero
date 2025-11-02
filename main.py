@@ -20,6 +20,10 @@ def parseUserInput() -> Direction | None:
     elif keyboard.is_pressed('d') or keyboard.is_pressed('right'):
         return Direction.RIGHT
     return None
+def displayGameStats(console: Console, game: Game) -> None:
+    console.print(f"State: {game.gameState}")
+    console.print(f"Time left: {game.getTimeLeft()}")
+    console.print(f"Score: {game.score}\t\tHealth: {game.player.health}")
 
 def displayGrid(console: Console, grid: list) -> None:
     for row in grid:

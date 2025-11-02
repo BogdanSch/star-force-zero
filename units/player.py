@@ -1,17 +1,18 @@
 import time
-from units.unit import Unit
 from enums.direction import Direction
+from units.unitWithHealth import UnitWithHealth
 
-class Player(Unit):
+
+class Player(UnitWithHealth):
     PLAYER_SYMBOL: str = '▲'
     PLAYER_MAX_HEALTH: int = 3
     fireCountdown: float = .5
 
-    def __init__(self, name: str = "Main", location: tuple = (0, 0), score: int = 0):
+    def __init__(self, name: str, location: tuple = (0, 0), damage: int = 1, score: int = 0):
+        super().__init__(name, self.PLAYER_SYMBOL, location, self.PLAYER_MAX_HEALTH)
         self.score = score
-        self.health = self.PLAYER_MAX_HEALTH
+        self.damage = damage
         self.lastFireTime = time.time()
-        super().__init__(name, self.PLAYER_SYMBOL, location)
 
     def incrementScore(self, value: int) -> None:
         self.score += value
@@ -28,6 +29,7 @@ class Player(Unit):
         return self.location
 
     def canFire(self) -> bool:
+        """Checks if the player can attack"""
         return time.time() - self.lastFireTime > self.fireCountdown
 
     def fire(self):

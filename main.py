@@ -2,13 +2,14 @@ import keyboard
 import pyfiglet
 import time
 
+from typing import Iterator, Final
 from units.player import Player
 from logic.game import Game
 from enums.direction import Direction
 from rich.console import Console
 
-TIMER_INTERVAL: float = 0.1
-GAME_DURATION_IN_SECONDS: int = 240
+TIMER_INTERVAL: Final[float] = 0.1
+GAME_DURATION_IN_SECONDS: Final[int] = 240
 
 def parseUserInput() -> Direction | None:
     if keyboard.is_pressed('w') or keyboard.is_pressed('up'):
@@ -20,12 +21,13 @@ def parseUserInput() -> Direction | None:
     elif keyboard.is_pressed('d') or keyboard.is_pressed('right'):
         return Direction.RIGHT
     return None
-def displayGameStats(console: Console, game: Game) -> None:
-    console.print(f"State: {game.gameState}")
-    console.print(f"Time left: {game.getTimeLeft()}")
-    console.print(f"Score: {game.score}\t\tHealth: {game.player.health}")
 
-def displayGrid(console: Console, grid: list) -> None:
+def displayGameStats(console: Console, game: Game) -> None:
+    console.print(f"State: {game.gameState}", style="orange1")
+    console.print(f"Time left: {game.getTimeLeft()}", style="medium_violet_red")
+    console.print(f"Score: {game.player.score}\t\tHealth: {game.player.health}", style="green3")
+
+def displayGrid(console: Console, grid: Iterator[list]) -> None:
     for row in grid:
         console.print(''.join(f"{str(cell)}" for cell in row))
 
@@ -52,7 +54,6 @@ def main() -> None:
             game.movePlayer(direction)
         if keyboard.is_pressed('space'):
             game.spawnBullet()
-            console.print(game._Game__bullets)
 
         game.update()
         console.clear()
@@ -60,6 +61,8 @@ def main() -> None:
         console.print(game.gameState)
         displayGrid(console, game.grid)
         time.sleep(TIMER_INTERVAL)
+
+    print("Game Over!")
 
 if __name__ == "__main__":
     main()

@@ -1,11 +1,11 @@
 import time
+from typing import Final
 from enums.direction import Direction
 from units.unitWithHealth import UnitWithHealth
 
-
 class Player(UnitWithHealth):
-    PLAYER_SYMBOL: str = '▲'
-    PLAYER_MAX_HEALTH: int = 3
+    PLAYER_SYMBOL: Final[str] = '▲'
+    PLAYER_MAX_HEALTH: Final[int] = 3
     fireCountdown: float = .5
 
     def __init__(self, name: str, location: tuple = (0, 0), damage: int = 1, score: int = 0):

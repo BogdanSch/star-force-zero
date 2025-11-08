@@ -10,6 +10,8 @@ from enums.direction import Direction
 class Game:
     EMPTY_CELL_SYMBOL: Final[str] = ' '
     ENEMY_SPAWN_INTERVAL_DECREMENT: Final[float] = 0.1
+    MIN_ENEMY_SPAWN_INTERVAL: Final[float] = 0.5
+    ENEMY_MOVE_EVERY_N_FRAMES = 5
     # __slots__ = ["player", "gridSize", "gameDurationInSeconds", "__grid", "__gameState", "__bullets", "__enemies", "startTime"]
 
     def __init__(self, player: Player, gridSize: tuple, gameDurationInSeconds: int):
@@ -28,6 +30,7 @@ class Game:
 
         self.__enemySpawnInterval = 5.0
         self.__lastEnemySpawnTime = time.time()
+        self.__frameCounter = 0
 
     def initializeGrid(self):
         for y in range(self.gridSize[1]):
@@ -63,7 +66,6 @@ class Game:
         if location[0] <= 0 or location[0] >= self.gridSize[0]: return False
         elif location[1] <= 0 or location[1] >= self.gridSize[1]: return False
         elif (isinstance(self.__grid[location[1]][location[0]], Wall)
-                # or isinstance(self.__grid[location[1]][location[0]], Enemy)
                 or isinstance(self.__grid[location[1]][location[0]], Bullet)): return False
         return True
 
@@ -136,9 +138,12 @@ class Game:
             self.__grid[bullet.location[1]][bullet.location[0]] = self.EMPTY_CELL_SYMBOL
 
     def update(self) -> None:
+        self.__frameCounter += 1
+
         self.trySpawnEnemy()
         self.moveBullets()
-        self.moveEnemies()
+        if self.__frameCounter % self.ENEMY_MOVE_EVERY_N_FRAMES == 0:
+            self.moveEnemies()
 
     def spawnBullet(self) -> None:
         if not self.player.canFire():
@@ -159,7 +164,9 @@ class Game:
         if time.time() - self.__lastEnemySpawnTime < self.__enemySpawnInterval:
             return
         self.__lastEnemySpawnTime = time.time()
-        self.__enemySpawnInterval -= self.ENEMY_SPAWN_INTERVAL_DECREMENT
+
+        if self.__enemySpawnInterval > MIN_ENEMY_SPAWN_INTERVAL:
+            self.__enemySpawnInterval -= self.ENEMY_SPAWN_INTERVAL_DECREMENT
 
         enemy = Enemy("Normal", (random.randint(1, len(self.__grid[0]) - 2), 1))
         self.__enemies.append(enemy)

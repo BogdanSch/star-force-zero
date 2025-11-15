@@ -14,7 +14,7 @@ class Player(UnitWithHealth):
         self.damage = damage
         self.lastFireTime = time.time()
 
-    def incrementScore(self, value: int) -> None:
+    def incrementScore(self, value: int = 1) -> None:
         self.score += value
 
     def getNextLocation(self, direction: Direction) -> tuple:

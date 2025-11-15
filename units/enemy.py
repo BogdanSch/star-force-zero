@@ -8,13 +8,11 @@ class Enemy(UnitWithHealth):
         super().__init__(name, symbol, location, health)
         self.__damage = damage
     def getNextLocation(self, direction: Direction = Direction.DOWN) -> tuple:
-        if direction == Direction.DOWN:
-            return (self.location[0], self.location[1] + 1)
+        nextLocation = [self.location[0], self.location[1] + 1]
         
         chance = random.random()
-        if chance < 0.3:
-            return (self.location[0] - 1, self.location[1])
-        elif chance < 0.6:
-            return (self.location[0] + 1, self.location[1])
-        
-        return self.location
+        if 0.35 < chance < 0.4:
+            nextLocation[0] = nextLocation[0] - 1
+        elif 0.55 < chance < 0.6:
+            nextLocation[0] = nextLocation[0] + 1
+        return nextLocation

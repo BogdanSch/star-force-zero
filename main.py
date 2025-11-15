@@ -1,20 +1,27 @@
-# import keyboard
-import pyfiglet
 import time
 import pygame
 
 from typing import Iterator, Final
+from config import DB_PATH
+from repositories.scoreRepository import ScoreRepository
 from units.player import Player
 from units.enemy import Enemy
 from units.bullet import Bullet
 from units.wall import Wall
 from logic.game import Game
 from enums.direction import Direction
-from rich.console import Console
+from helpers.timeHelper import formatTimeInSeconds
 
 FRAME_RATE: Final[int] = 30
-GAME_DURATION_IN_SECONDS: Final[int] = 240
-CELL_SIZE: int = 24
+GAME_DURATION_IN_SECONDS: Final[int] = 180
+CELL_SIZE: Final[int] = 24
+IMAGE_SCALE_COEFFICIENT: Final[float] = 1.5
+
+SCREEN_WIDTH: Final[int] = 860
+SCREEN_HEIGHT: Final[int] = 620
+
+DARK_COLOR: Final[tuple[int, int, int]] = (20, 20, 20)
+LIGHT_COLOR: Final[tuple[int, int, int]] = (200, 200, 200)
 
 def parseUserInput(event: pygame.Event) -> Direction | None:
     if event.key == pygame.K_UP or event.key == pygame.K_w:
@@ -27,43 +34,72 @@ def parseUserInput(event: pygame.Event) -> Direction | None:
         return Direction.RIGHT
     return None
 
-def displayGameStats(game: Game) -> None:
-    pass
-    # console.print(f"State: {game.gameState}", style="orange1", justify="center")
-    # console.print(f"Time left: {game.getTimeLeft()}", style="medium_violet_red", justify="center")
-    # console.print(f"Score: {game.player.score}\t\tHealth: {game.player.health}", style="blue", justify="center")
+def displayMainMenu(screen: pygame.Surface, titleFont: pygame.font.Font, paragraphFont: pygame.font.Font) -> None:
+# def displayWelcomeMessage(screen: pygame.Surface) -> None:
+    text = titleFont.render("Star Force Zero", True, LIGHT_COLOR)
+    text_rect = text.get_rect(center=(SCREEN_WIDTH / 2, 8))
+    screen.blit(text, text_rect)
 
-def displayGrid(screen: pygame.Surface, grid: Iterator[list]) -> None:
+    text = paragraphFont.render("Welcome to Star Force Zero! Use W/A/S/D or Arrow keys to move. Press Close to exit the game.", True, LIGHT_COLOR)
+    text_rect = text.get_rect(center=(SCREEN_WIDTH / 2, 40))
+    screen.blit(text, text_rect)
+
+def displayGameStats(screen: pygame.Surface, game: Game, paragraphFont: pygame.font.Font) -> None:
+    PADDING_X = 20
+    START_Y = 60
+    LINE_SPACING = 30
+
+    stats = [
+        f"State: {game.gameState}",
+        f"Time left: {formatTimeInSeconds(game.getTimeLeft())}",
+        f"Score: {game.player.score}\tHealth: {game.player.health}"
+    ]
+
+    for i, line in enumerate(stats):
+        text = paragraphFont.render(line, True, LIGHT_COLOR)
+        text_rect = text.get_rect()
+        text_rect.topright = (SCREEN_WIDTH - PADDING_X, START_Y + i * LINE_SPACING)
+        screen.blit(text, text_rect)
+
+def displayGrid(screen: pygame.Surface, grid: Iterator[list], playerImage: pygame.Surface, enemyImage: pygame.Surface) -> None:
     matrix = list(grid)
-
     for y in range(len(matrix)):
         for x in range(len(matrix[y])):
             cell = matrix[y][x]
             rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
             if isinstance(cell, Player):
-                pygame.draw.rect(screen, (0, 255, 0), rect)
+                screen.blit(playerImage, rect)
             elif isinstance(cell, Enemy):
-                pygame.draw.rect(screen, (255, 0, 0), rect)
+                screen.blit(enemyImage, rect)
             elif isinstance(cell, Bullet):
                 pygame.draw.rect(screen, (255, 255, 0), rect)
             elif isinstance(cell, Wall):
                 pygame.draw.rect(screen, (100, 100, 100), rect)
 
-def displayWelcomeMessage() -> None:
-    pass
-    # console.print(pyfiglet.figlet_format("Star Force Zero", font = "isometric1" ))
-    # console.print("Welcome to Star Force Zero! Use W/A/S/D or Arrow keys to move. Press 'Esc' to exit the game.")
+def createImage(path: str):
+    image = pygame.image.load(path).convert_alpha()
+    return pygame.transform.scale(image, (CELL_SIZE * IMAGE_SCALE_COEFFICIENT, CELL_SIZE * IMAGE_SCALE_COEFFICIENT))
 
 def main() -> None:
+    scoreRepository = ScoreRepository(DB_PATH)
     pygame.init()
-    screen = pygame.display.set_mode((800, 600))
+    pygame.font.init()
+
+    titleFont = pygame.font.Font(None, 40)
+    paragraphFont = pygame.font.Font(None, 20)
+
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption("Sky Force Zero")
     clock = pygame.time.Clock()
 
     player = Player("Starkiller", (10, 20))
-    game = Game(player, (20, 24), GAME_DURATION_IN_SECONDS)
+    game = Game(player, (26, 26), GAME_DURATION_IN_SECONDS)
 
-    displayWelcomeMessage()
-    displayGrid(screen, game.grid)
+    playerImage = createImage("./assets/player-ship.png")
+    enemyImage = createImage("./assets/enemy-ship.png")
+
+    displayMainMenu(screen, titleFont, paragraphFont)
+    displayGrid(screen, game.grid, playerImage, enemyImage)
 
     running: bool = True
     while running and not game.isGameOver():
@@ -73,19 +109,18 @@ def main() -> None:
             if event.type == pygame.QUIT: running = False
             elif event.type == pygame.KEYDOWN:
                 direction = parseUserInput(event)
-                if direction:
-                    game.movePlayer(direction)
-                if event.key == pygame.K_SPACE:
-                    game.spawnBullet()
+                if direction: game.movePlayer(direction)
+                if event.key == pygame.K_SPACE: game.spawnBullet()
 
         game.update()
 
-        displayGameStats(game)
-        displayGrid(screen, game.grid)
+        displayGameStats(screen, game, paragraphFont)
+        displayGrid(screen, game.grid, playerImage, enemyImage)
 
         pygame.display.flip()
         clock.tick(FRAME_RATE)
 
+    game.saveProgress(scoreRepository)
     pygame.quit()
 
 if __name__ == "__main__":

@@ -1,6 +1,10 @@
+import datetime
 import random
 import time
+
 from typing import Final, Iterator
+from repositories.scoreRepository import ScoreRepository
+from data.score import Score
 from units.player import Player
 from units.wall import Wall
 from units.enemy import Enemy
@@ -11,7 +15,9 @@ class Game:
     EMPTY_CELL_SYMBOL: Final[str] = ' '
     ENEMY_SPAWN_INTERVAL_DECREMENT: Final[float] = 0.1
     MIN_ENEMY_SPAWN_INTERVAL: Final[float] = 0.5
-    ENEMY_MOVE_EVERY_N_FRAMES = 5
+    ENEMY_MOVE_EVERY_N_FRAMES: Final[int] = 5
+    SCORE_INCREMENT: Final[int] = 20
+    SCORE_REWARD_FRAMES_INTERVAL: Final[int] = 40
     # __slots__ = ["player", "gridSize", "gameDurationInSeconds", "__grid", "__gameState", "__bullets", "__enemies", "startTime"]
 
     def __init__(self, player: Player, gridSize: tuple, gameDurationInSeconds: int):
@@ -54,7 +60,7 @@ class Game:
         return self.__gameState
 
     def getTimeLeft(self) -> float:
-        return time.time() - self.startTime
+        return self.startTime + self.gameDurationInSeconds - time.time()
 
     def isGameOver(self) -> bool:
         if time.time() - self.startTime > self.gameDurationInSeconds or self.player.health <= 0:
@@ -69,8 +75,8 @@ class Game:
                 or isinstance(self.__grid[location[1]][location[0]], Bullet)): return False
         return True
 
-    # def isLocationAtBorder(self, location: tuple) -> bool:
-    #     return (location[0] <= 0 or location[0] >= self.gridSize[0]) or (location[1] <= 0 or location[1] >= self.gridSize[1])
+    def isLocationAtLowerBorder(self, location: tuple) -> bool:
+        return location[1] == self.gridSize[1] - 1
 
     def moveEnemies(self):
         enemiesToRemove = []
@@ -86,7 +92,7 @@ class Game:
                 self.__gameState = "Player was hit by enemy"
                 enemiesToRemove.append(enemy)
                 self.player.takeDamage(1)
-            elif targetUnit and isinstance(targetUnit, Wall):
+            elif targetUnit and isinstance(targetUnit, Wall) and self.isLocationAtLowerBorder(targetLocation):
                 self.__gameState = "Enemy reached the base"
                 enemiesToRemove.append(enemy)
                 self.player.takeDamage(1)
@@ -123,8 +129,7 @@ class Game:
             if targetUnit and isinstance(targetUnit, Enemy):
                 bulletsToRemove.append(bullet)
                 targetUnit.takeDamage(1)
-                # self.__enemies.remove(targetUnit)
-                # self.__grid[targetLocation[1]][targetLocation[0]] = self.EMPTY_CELL_SYMBOL
+                self.player.incrementScore(self.SCORE_INCREMENT)
             elif targetUnit and isinstance(targetUnit, Wall):
                 bulletsToRemove.append(bullet)
             else:
@@ -139,6 +144,8 @@ class Game:
 
     def update(self) -> None:
         self.__frameCounter += 1
+        if self.__frameCounter % self.SCORE_REWARD_FRAMES_INTERVAL == 0:
+            self.player.incrementScore()
 
         self.trySpawnEnemy()
         self.moveBullets()
@@ -165,8 +172,12 @@ class Game:
             return
         self.__lastEnemySpawnTime = time.time()
 
-        if self.__enemySpawnInterval > MIN_ENEMY_SPAWN_INTERVAL:
+        if self.__enemySpawnInterval > self.MIN_ENEMY_SPAWN_INTERVAL:
             self.__enemySpawnInterval -= self.ENEMY_SPAWN_INTERVAL_DECREMENT
 
         enemy = Enemy("Normal", (random.randint(1, len(self.__grid[0]) - 2), 1))
         self.__enemies.append(enemy)
+
+    def saveProgress(self, scoreRepository: ScoreRepository) -> None:
+        score = Score(self.player.name, self.player.score, datetime.datetime.now().isoformat())
+        scoreRepository.addScore(score)

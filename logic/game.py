@@ -15,7 +15,7 @@ class Game:
     EMPTY_CELL_SYMBOL: Final[str] = ' '
     ENEMY_SPAWN_INTERVAL_DECREMENT: Final[float] = 0.1
     MIN_ENEMY_SPAWN_INTERVAL: Final[float] = 0.5
-    ENEMY_MOVE_EVERY_N_FRAMES: Final[int] = 5
+    ENEMY_MOVE_EVERY_N_FRAMES: Final[int] = 8
     SCORE_INCREMENT: Final[int] = 20
     SCORE_REWARD_FRAMES_INTERVAL: Final[int] = 40
     # __slots__ = ["player", "gridSize", "gameDurationInSeconds", "__grid", "__gameState", "__bullets", "__enemies", "startTime"]
@@ -178,6 +178,8 @@ class Game:
         enemy = Enemy("Normal", (random.randint(1, len(self.__grid[0]) - 2), 1))
         self.__enemies.append(enemy)
 
+    def getScore(self) -> Score:
+        return Score(self.player.name, self.player.score, datetime.datetime.now().isoformat())
+
     def saveProgress(self, scoreRepository: ScoreRepository) -> None:
-        score = Score(self.player.name, self.player.score, datetime.datetime.now().isoformat())
-        scoreRepository.addScore(score)
+        scoreRepository.addScore(self.getScore())

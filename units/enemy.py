@@ -15,4 +15,4 @@ class Enemy(UnitWithHealth):
             nextLocation[0] = nextLocation[0] - 1
         elif 0.55 < chance < 0.6:
             nextLocation[0] = nextLocation[0] + 1
-        return nextLocation
+        return tuple(nextLocation)

@@ -1,7 +1,7 @@
 import random
 from typing import Final
 from units.unitWithHealth import UnitWithHealth
-from enums.direction import Direction
+from data.enums.direction import Direction
 
 class Enemy(UnitWithHealth):
     def __init__(self, name: str, location: tuple, symbol: str = '!', health: int = 1, damage: int = 1):

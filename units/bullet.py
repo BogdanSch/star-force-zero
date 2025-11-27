@@ -1,5 +1,5 @@
 from units.unit import Unit
-from enums.direction import Direction
+from data.enums.direction import Direction
 
 class Bullet(Unit):
     BULLET_SYMBOL: str = '◈'

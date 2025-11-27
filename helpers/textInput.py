@@ -1,7 +1,7 @@
 import pygame
 
 class TextInput():
-	def __init__(self, position: tuple[int, int], value: str, placeholder: str, font: pygame.font.Font, baseColor: tuple[int, int, int], image: pygame.Surface | None):
+	def __init__(self, position: tuple[int, int], value: str, placeholder: str, font: pygame.font.Font, baseColor: tuple[int, int, int], image: pygame.Surface | None = None):
 		self.image = image
 		self.position = position
 		self.font = font
@@ -23,9 +23,7 @@ class TextInput():
 		screen.blit(self.label, self.labelRect)
 
 	def inputValue(self, key: int, character: str):
-		if not self._isEnabled:
-			return
-
+		if not self._isEnabled: return
 		if key == pygame.K_BACKSPACE:
 			self.value = self.value[:-1]
 		else:
@@ -34,6 +32,9 @@ class TextInput():
 		display_text = self.value if self.value else self.placeholder
 		self.label = self.font.render(display_text, True, self.baseColor)
 		self.labelRect = self.label.get_rect(center=(self.position[0], self.position[1]))
+	
+	def isEmpty(self) -> bool:
+		return len(self.value.strip()) == 0
 
 	@property
 	def isEnabled(self) -> bool:

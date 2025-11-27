@@ -1,6 +1,6 @@
 import time
 from typing import Final
-from enums.direction import Direction
+from data.enums.direction import Direction
 from units.unitWithHealth import UnitWithHealth
 
 class Player(UnitWithHealth):

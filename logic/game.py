@@ -9,7 +9,7 @@ from units.player import Player
 from units.wall import Wall
 from units.enemy import Enemy
 from units.bullet import Bullet
-from enums.direction import Direction
+from data.enums.direction import Direction
 
 class Game:
     EMPTY_CELL_SYMBOL: Final[str] = ' '

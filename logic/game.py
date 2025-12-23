@@ -5,6 +5,7 @@ import time
 from typing import Final, Iterator
 from repositories.scoreRepository import ScoreRepository
 from data.score import Score
+from units.unit import Unit
 from units.player import Player
 from units.wall import Wall
 from units.enemy import Enemy
@@ -18,8 +19,7 @@ class Game:
 
     ENEMY_SPAWN_INTERVAL_DECREMENT: Final[float] = 0.04
     MIN_ENEMY_SPAWN_INTERVAL: Final[float] = 0.5
-    ENEMY_MOVE_EVERY_N_FRAMES: Final[int] = 8
-    MAX_NUMBER_OF_ENEMIES_TO_SPAWN: Final[int] = 3
+    MAX_NUMBER_OF_ENEMIES_TO_SPAWN: Final[int] = 4
 
     SCORE_INCREMENT: Final[int] = 20
     SCORE_REWARD_FRAMES_INTERVAL: Final[int] = 40
@@ -40,7 +40,7 @@ class Game:
         self.startTime = time.time()
         self.gameDurationInSeconds = gameDurationInSeconds
 
-        self._enemySpawnInterval = 5.0
+        self._enemySpawnInterval = 9.0
         self._lastEnemySpawnTime = time.time()
         self._frameCounter = 0
 
@@ -75,15 +75,13 @@ class Game:
         return False
 
     def isLocationValid(self, location: tuple) -> bool:
-        unit: Unit | str = self._grid[location[1]][location[0]]
         if location[0] <= 0 or location[0] >= self.gridSize[0]: return False
         elif location[1] <= 0 or location[1] >= self.gridSize[1]: return False
-        elif (isinstance(unit, Wall)
-            or isinstance(unit, Bullet)
-            or isinstance(unit, Enemy)
-            or isinstance(unit, Crate)
-            or isinstance(unit, Pickup)): return False
         return True
+
+    def isBlocked(self, location: tuple) -> bool:
+        unit: Unit | str = self._grid[location[1]][location[0]]
+        return isinstance(unit, (Wall, Bullet, Enemy, Crate))
 
     def isLocationAtLowerBorder(self, location: tuple) -> bool:
         return location[1] == self.gridSize[1] - 1
@@ -104,12 +102,12 @@ class Game:
                 self._gameState = "Player was hit by enemy"
                 enemiesToRemove.append(enemy)
                 self.player.takeDamage(1)
-            elif targetUnit and isinstance(targetUnit, Wall) and self.isLocationAtLowerBorder(targetLocation):
+            elif self.isLocationAtLowerBorder(targetLocation):
                 self._gameState = "Enemy reached the base"
                 enemiesToRemove.append(enemy)
                 self.player.takeDamage(1)
             else:
-                if self.isLocationValid(targetLocation):
+                if self.isLocationValid(targetLocation) and not self.isBlocked(targetLocation):
                     self._grid[enemy.location[1]][enemy.location[0]] = self.EMPTY_CELL_SYMBOL
                     enemy.location = targetLocation
                     self._grid[enemy.location[1]][enemy.location[0]] = enemy
@@ -121,12 +119,18 @@ class Game:
     def movePlayer(self, direction: Direction) -> None:
         nextLocation = self.player.getNextLocation(direction)
         if not self.isLocationValid(nextLocation): return
-
         targetUnit = self._grid[nextLocation[1]][nextLocation[0]]
+
         if isinstance(targetUnit, Enemy) and targetUnit.isAlive():
             self._gameState = "Player was hit by enemy"
             self._enemies.remove(targetUnit)
             self.player.takeDamage(1)
+        elif isinstance(targetUnit, Pickup):
+            self._gameState = f"Picked up {targetUnit.type.value}"
+            self.player.inventory.append(targetUnit)
+            self._pickups.remove(targetUnit)
+
+        if self.isBlocked(nextLocation): return
 
         self._grid[self.player.location[1]][self.player.location[0]] = self.EMPTY_CELL_SYMBOL
         self.player.location = nextLocation
@@ -136,32 +140,36 @@ class Game:
         bulletsToRemove = []
         for bullet in self._bullets:
             targetLocation = bullet.getNextLocation()
-            targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
-
+            if not self.isLocationValid(targetLocation):
+                bulletsToRemove.append(bullet)
+                continue
             if not bullet.shouldMove(): continue
+
+            targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
 
             if targetUnit and isinstance(targetUnit, Enemy):
                 bulletsToRemove.append(bullet)
                 targetUnit.takeDamage(1)
                 self.player.incrementScore(self.SCORE_INCREMENT)
-            elif targetUnit and isinstance(targetUnit, Wall):
-                bulletsToRemove.append(bullet)
             elif targetUnit and isinstance(targetUnit, Crate):
                 bulletsToRemove.append(bullet)
                 targetUnit.takeDamage(1)
                 if targetUnit.isAlive():
                     continue
+
                 pickup: Pickup = targetUnit.spawnPickup()
                 pickup.location = targetLocation
+
                 self._pickups.append(pickup)
                 self._crates.remove(targetUnit)
                 self._grid[bullet.location[1]][bullet.location[0]] = self.EMPTY_CELL_SYMBOL
                 self._grid[targetLocation[1]][targetLocation[0]] = pickup
+            elif targetUnit and isinstance(targetUnit, Pickup):
+                bulletsToRemove.append(bullet)
             else:
-                if self.isLocationValid(targetLocation):
-                    self._grid[bullet.location[1]][bullet.location[0]] = self.EMPTY_CELL_SYMBOL
-                    bullet.location = targetLocation
-                    self._grid[bullet.location[1]][bullet.location[0]] = bullet
+                self._grid[bullet.location[1]][bullet.location[0]] = self.EMPTY_CELL_SYMBOL
+                bullet.location = targetLocation
+                self._grid[bullet.location[1]][bullet.location[0]] = bullet
 
         for bullet in bulletsToRemove:
             self._bullets.remove(bullet)
@@ -175,6 +183,7 @@ class Game:
             targetLocation = crate.getNextLocation()
             if self.isLocationAtLowerBorder(targetLocation):
                 cratesToRemove.append(crate)
+                continue
             if not self.isLocationValid(targetLocation):
                 continue
 
@@ -207,11 +216,13 @@ class Game:
             return
 
         bulletLocation = self.player.getNextLocation(Direction.UP)
-        if self.isLocationValid(bulletLocation):
-            self.player.fire()
-            bullet = Bullet(bulletLocation)
-            self._bullets.append(bullet)
-            self._grid[bullet.location[1]][bullet.location[0]] = bullet
+        if not self.isLocationValid(bulletLocation) or self.isBlocked(bulletLocation):
+            return
+
+        self.player.fire()
+        bullet = Bullet(bulletLocation)
+        self._bullets.append(bullet)
+        self._grid[bullet.location[1]][bullet.location[0]] = bullet
 
     def trySpawnEnemies(self) -> None:
         if time.time() - self._lastEnemySpawnTime < self._enemySpawnInterval: return
@@ -227,7 +238,7 @@ class Game:
         xPositions = []
         for offset in possibleOffsets:
             x = anchorX + offset
-            if self.isLocationValid((x, 1)):
+            if self.isLocationValid((x, 1)) and not self.isBlocked((x, 1)):
                 xPositions.append(x)
             if len(xPositions) == count: break
         for x in xPositions:
@@ -236,11 +247,11 @@ class Game:
             self._grid[1][x] = enemy
 
     def trySpawnCrate(self):
-        if random.random() > 10e-4 / 2: return
+        if random.random() > 10e-4 / 1.5: return
 
         x = random.randint(1, self.gridSize[0] - 2)
-        if not self.isLocationValid((x, 1)):
-            return
+        if not self.isLocationValid((x, 1)) or self.isBlocked((x, 1)): return
+
         crate = Crate("Crate", (x, 1))
         self._crates.append(crate)
         self._grid[1][x] = crate

@@ -4,6 +4,7 @@ import os
 
 from typing import Iterator, Final
 from pygame import Surface
+from pygame.font import Font
 from config import DB_PATH
 from helpers.button import Button
 from helpers.textInput import TextInput
@@ -12,27 +13,30 @@ from data.score import Score
 from units.player import Player
 from units.bullet import Bullet
 from units.wall import Wall
+from units.pickups.pickup import Pickup
 from logic.game import Game
 from data.enums.direction import Direction
+from data.enums.pickupType import PickupType
 from helpers.timeHelper import formatTimeInSeconds
+from colors import DARK_COLOR, GREY_COLOR, LIGHT_COLOR, RED_COLOR
 
 USERNAME_FILE_PATH: Final[str] = "username.txt"
 
 FRAME_RATE: Final[int] = 30
 GAME_DURATION_IN_SECONDS: Final[int] = 180
 CELL_SIZE: Final[int] = 28
-TOP_SCORES_COUNT: Final[int] = 6
+TOP_SCORES_LENGTH: Final[int] = 6
 
 SCREEN_WIDTH: Final[int] = 1060
 SCREEN_HEIGHT: Final[int] = 760
-
-from colors import DARK_COLOR, GREY_COLOR, LIGHT_COLOR, RED_COLOR
 
 CELL_RENDERERS = {
     "Player": lambda screen, rect, images: screen.blit(images["player"], rect),
     "Enemy":  lambda screen, rect, images: screen.blit(images["enemy"], rect),
     "Crate":  lambda screen, rect, images: screen.blit(images["crate"], rect),
-    "Bullet": lambda screen, rect, images: pygame.draw.rect(screen, (255, 255, 0), rect),
+    "Heal": lambda screen, rect, images: screen.blit(images["heart"], rect),
+    "Megabomb": lambda screen, rect, images: screen.blit(images["megabomb"], rect),
+    "Bullet": lambda screen, rect, images: screen.blit(images["laserBullet"], rect),
     "Wall":   lambda screen, rect, images: pygame.draw.rect(screen, GREY_COLOR, rect),
 }
 
@@ -143,7 +147,7 @@ def displayGameOverScreen(screen: pygame.Surface, game: Game, scoreRepository: S
         playAgainButton.changeColor(playerMousePosition)
         playAgainButton.update(screen)
 
-        displayTopScoresTable(scoreRepository.getTop(TOP_SCORES_COUNT), screen, paragraphFont, (SCREEN_WIDTH // 2, 480))
+        displayTopScoresTable(scoreRepository.getTop(TOP_SCORES_LENGTH), screen, paragraphFont, (SCREEN_WIDTH // 2, 480))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -210,7 +214,7 @@ def parseUserInput(event: pygame.event.Event) -> Direction | None:
         return Direction.RIGHT
     return None
 
-def displayGameStats(screen: pygame.Surface, game: Game, paragraphFont: pygame.font.Font) -> None:
+def displayGameStats(screen: Surface, game: Game, paragraphFont: Font) -> None:
     PADDING_X: Final[int] = 20
     START_Y: Final[int] = 60
     LINE_SPACING: Final[int] = 30
@@ -228,14 +232,34 @@ def displayGameStats(screen: pygame.Surface, game: Game, paragraphFont: pygame.f
         text_rect.topright = (SCREEN_WIDTH - PADDING_X, START_Y + i * LINE_SPACING)
         screen.blit(text, text_rect)
 
-def displayGrid(screen: pygame.Surface, grid: Iterator[list], images: dict[str, Surface]) -> None:
-    matrix = matrix = [row[:] for row in grid]
+def displayInventory(screen: Surface, player: Player, paragraphFont: Font) -> None:
+    PADDING_X: Final[int] = 20
+    PADDING_Y: Final[int] = 40
+
+    inventoryFrequencyList: dict[str, int] = defaultdict(int)
+    for item in player.inventory:
+        inventoryFrequencyList[item] += 1
+
+    inventoryString: str = "Inventory: " + (", ".join([f"{key} = {value}" for (key, value) in inventoryFrequencyList.items()]))
+
+    text = paragraphFont.render(inventoryString, True, LIGHT_COLOR)
+    textRect = text.get_rect()
+    textRect.bottomleft = (PADDING_X, START_Y)
+    screen.blit(text, textRect)
+
+def displayGrid(screen: Surface, grid: Iterator[list], images: dict[str, Surface]) -> None:
+    matrix = list(grid)
     for y in range(len(matrix)):
         for x in range(len(matrix[y])):
             cell = matrix[y][x]
             rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
 
-            drawer = CELL_RENDERERS.get(type(cell).__name__)
+            drawer = None
+            if isinstance(cell, Pickup):
+                drawer = CELL_RENDERERS.get(cell.type.value.title())
+            else:
+                drawer = CELL_RENDERERS.get(type(cell).__name__)
+
             if drawer: drawer(screen, rect, images)
 
 def saveUsername(name: str) -> None:
@@ -266,13 +290,15 @@ def main() -> None:
     objectImages: dict[str, Surface] = {
         "player": createImage("./assets/player-ship.png"),
         "enemy": createImage("./assets/enemy-ship.png"),
-        "crate": createImage("./assets/crate.png")
+        "crate": createImage("./assets/crate.png"),
+        "laserBullet": createImage("./assets/laser-bullet.png"),
+        "heart": createImage("./assets/heart.png"),
+        "megabomb": createImage("./assets/megabomb.png")
     }
     placeholderImages: dict[str, Surface] = {
         "input": createImage("./assets/input-placeholder.png", (320, 180)),
         "button": createImage("./assets/button-placeholder.png", (280, 160))
     }
-
     displayMainMenuScreen(screen, placeholderImages["button"], titleFont, paragraphFont)
 
     while True:

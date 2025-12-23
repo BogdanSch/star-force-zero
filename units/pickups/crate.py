@@ -6,13 +6,13 @@ from data.enums.pickupType import PickupType
 
 class Crate(UnitWithHealth):
     pickupSymbols: dict[str, str] = {
-        PickupType.HEALTH: '❤️',
+        PickupType.HEAL: '❤️',
         PickupType.MEGABOMB: '💣'
     }
     def __init__(self, name: str, location: tuple, speed: int = 4, health: int = 1, symbol: str = 'X'):
         super().__init__(name, symbol, location, speed, health)
         self.pickupType = random.choice([
-            PickupType.HEALTH,
+            PickupType.HEAL,
             PickupType.MEGABOMB
         ])
     def spawnPickup(self):

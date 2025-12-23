@@ -10,9 +10,10 @@ class Player(UnitWithHealth):
 
     def __init__(self, name: str, location: tuple, speed: int = 1, damage: int = 1, score: int = 0):
         super().__init__(name, self.PLAYER_SYMBOL, location, speed, self.PLAYER_MAX_HEALTH)
-        self.score = score
-        self.damage = damage
-        self.lastFireTime = time.time()
+        self.score: int = score
+        self.damage: int = damage
+        self.lastFireTime: float = time.time()
+        self.inventory: list[Pickup] = []
 
     def incrementScore(self, value: int = 1) -> None:
         self.score += value

@@ -3,5 +3,5 @@ from units.unit import Unit
 
 class Pickup(Unit):
     def __init__(self, pickupType: PickupType, pickupSymbol: str, location: tuple[int, int]) -> None:
-        super().__init__(pickupType, pickupSymbol, location, 0)
-        self.pickupType = pickupType
+        super().__init__(pickupType.value, pickupSymbol, location, 0)
+        self.type = pickupType

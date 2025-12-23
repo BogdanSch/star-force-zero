@@ -1,5 +1,5 @@
 from enum import Enum
 
 class PickupType(Enum):
-    HEALTH = "health"
+    HEAL = "heal"
     MEGABOMB = "megabomb"

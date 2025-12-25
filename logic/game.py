@@ -36,7 +36,8 @@ class Game:
         self._crates: list[Crate] = []
         self._pickups: list[Pickup] = []
 
-        self._gameState = "The round has started"
+        self._gameStatus: str = "Running"
+        self._notifications: list[dict] = []
         self.startTime = time.time()
         self.gameDurationInSeconds = gameDurationInSeconds
 
@@ -70,7 +71,8 @@ class Game:
 
     def isGameOver(self) -> bool:
         if time.time() - self.startTime > self.gameDurationInSeconds or self.player.health <= 0:
-            self._gameState = "Game Over"
+            self._gameStatus = "Game Over"
+            self.addNotification("Game Over", 999)
             return True
         return False
 
@@ -85,7 +87,13 @@ class Game:
 
     def isLocationAtLowerBorder(self, location: tuple) -> bool:
         return location[1] == self.gridSize[1] - 1
-
+        
+    def addNotification(self, text: str, duration: float = 1.5) -> None:
+        self._notifications.append({
+            "text": text,
+            "expiresAt": time.time() + duration
+        })
+        
     def moveEnemies(self):
         enemiesToRemove = []
         for enemy in self._enemies:
@@ -99,11 +107,11 @@ class Game:
             targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
 
             if targetUnit and isinstance(targetUnit, Player):
-                self._gameState = "Player was hit by enemy"
+                self.addNotification("Player was hit by enemy")
                 enemiesToRemove.append(enemy)
                 self.player.takeDamage(1)
             elif self.isLocationAtLowerBorder(targetLocation):
-                self._gameState = "Enemy reached the base"
+                self.addNotification("Enemy reached the base")
                 enemiesToRemove.append(enemy)
                 self.player.takeDamage(1)
             else:
@@ -122,11 +130,11 @@ class Game:
         targetUnit = self._grid[nextLocation[1]][nextLocation[0]]
 
         if isinstance(targetUnit, Enemy) and targetUnit.isAlive():
-            self._gameState = "Player was hit by enemy"
+            self.addNotification("Player was hit by enemy")
             self._enemies.remove(targetUnit)
             self.player.takeDamage(1)
         elif isinstance(targetUnit, Pickup):
-            self._gameState = f"Picked up {targetUnit.type.value}"
+            self.addNotification(f"Picked up {targetUnit.type.value}")
             self.player.inventory.append(targetUnit)
             self._pickups.remove(targetUnit)
 
@@ -200,9 +208,9 @@ class Game:
         if self._frameCounter % self.SCORE_REWARD_FRAMES_INTERVAL == 0:
             self.player.incrementScore()
         if self.player.canFire():
-            self._gameState = "Ready to fire"
+            self.addNotification("Ready to fire", 0.45)
         else:
-            self._gameState = "Reloading"
+            self.addNotification("Reloading", 0.5)
 
         self.trySpawnCrate()
         self.trySpawnEnemies()
@@ -212,7 +220,6 @@ class Game:
 
     def spawnBullet(self) -> None:
         if not self.player.canFire():
-            self._gameState = "Reloading"
             return
 
         bulletLocation = self.player.getNextLocation(Direction.UP)

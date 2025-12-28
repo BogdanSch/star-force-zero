@@ -1,3 +1,4 @@
+from collections import defaultdict
 import sys
 import pygame
 import os
@@ -36,6 +37,7 @@ CELL_RENDERERS = {
     "Crate":  lambda screen, rect, images: screen.blit(images["crate"], rect),
     "Heal": lambda screen, rect, images: screen.blit(images["heart"], rect),
     "Megabomb": lambda screen, rect, images: screen.blit(images["megabomb"], rect),
+    "Extra Score": lambda screen, rect, images: screen.blit(images["extraScore"], rect),
     "Bullet": lambda screen, rect, images: screen.blit(images["laserBullet"], rect),
     "Wall":   lambda screen, rect, images: pygame.draw.rect(screen, GREY_COLOR, rect),
 }
@@ -52,7 +54,7 @@ def displayMainMenuScreen(screen: pygame.Surface, buttonPlaceholderImage: pygame
         titleRect = title.get_rect(center=(SCREEN_WIDTH / 2, 160))
         screen.blit(title, titleRect)
 
-        text = paragraphFont.render("Welcome to Star Force Zero! Use W/A/S/D or Arrow keys to move. Press Close to exit the game.", True, LIGHT_COLOR)
+        text = paragraphFont.render("Welcome to Star Force Zero! Use W/A/S/D or Arrow keys to move. Press the corresponding numeric button to activate a pickup. Press Close to exit the game.", True, LIGHT_COLOR)
         textRect = text.get_rect(center=(SCREEN_WIDTH / 2, 240))
         screen.blit(text, textRect)
 
@@ -240,11 +242,11 @@ def displayInventory(screen: Surface, player: Player, paragraphFont: Font) -> No
     for item in player.inventory:
         inventoryFrequencyList[item] += 1
 
-    inventoryString: str = "Inventory: " + (", ".join([f"{key} = {value}" for (key, value) in inventoryFrequencyList.items()]))
+    inventoryString: str = "Inventory: " + (", ".join([f"{index}: {key} = {inventoryFrequencyList[key]}" for (index, key) in enumerate(inventoryFrequencyList)]))
 
     text = paragraphFont.render(inventoryString, True, LIGHT_COLOR)
     textRect = text.get_rect()
-    textRect.bottomleft = (PADDING_X, START_Y)
+    textRect.bottomleft = (PADDING_X, PADDING_Y)
     screen.blit(text, textRect)
 
 def displayGrid(screen: Surface, grid: Iterator[list], images: dict[str, Surface]) -> None:
@@ -274,8 +276,8 @@ def getUsername() -> str:
 def createImage(path: str, size: tuple[int, int] = (CELL_SIZE, CELL_SIZE)) -> pygame.Surface:
     image = pygame.image.load(path).convert_alpha()
     return pygame.transform.scale(image, size)
-def createFont(size: int) -> pygame.font.Font:
-    return  pygame.font.Font(None, size)
+def createFont(size: int) -> Font:
+    return  Font(None, size)
 
 def main() -> None:
     scoreRepository = ScoreRepository(DB_PATH)
@@ -292,8 +294,9 @@ def main() -> None:
         "enemy": createImage("./assets/enemy-ship.png"),
         "crate": createImage("./assets/crate.png"),
         "laserBullet": createImage("./assets/laser-bullet.png"),
-        "heart": createImage("./assets/heart.png"),
-        "megabomb": createImage("./assets/megabomb.png")
+        "heart": createImage("./assets/pickups/heart.png"),
+        "extraScore": createImage("./assets/pickups/pixel-star.png"),
+        "megabomb": createImage("./assets/pickups/megabomb.png")
     }
     placeholderImages: dict[str, Surface] = {
         "input": createImage("./assets/input-placeholder.png", (320, 180)),

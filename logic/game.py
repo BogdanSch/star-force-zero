@@ -12,6 +12,7 @@ from units.enemy import Enemy
 from units.bullet import Bullet
 from units.pickups.crate import Crate
 from units.pickups.pickup import Pickup
+from data.enums.pickupType import PickupType
 from data.enums.direction import Direction
 
 class Game:
@@ -22,6 +23,7 @@ class Game:
     MAX_NUMBER_OF_ENEMIES_TO_SPAWN: Final[int] = 4
 
     SCORE_INCREMENT: Final[int] = 20
+    EXTRA_SCORE_INCREMENT: Final[int] = 100
     SCORE_REWARD_FRAMES_INTERVAL: Final[int] = 40
 
     def __init__(self, player: Player, gridSize: tuple, gameDurationInSeconds: int):
@@ -63,8 +65,12 @@ class Game:
             yield row
 
     @property
-    def gameState(self) -> str:
-        return self._gameState
+    def gameStatus(self) -> str:
+        return self._gameStatus
+
+    @property
+    def notifications(self) -> list[dict]:
+        return [n["text"] for n in self._notifications if n["expiresAt"] > time.time()]
 
     def getTimeLeft(self) -> float:
         return self.startTime + self.gameDurationInSeconds - time.time()
@@ -124,6 +130,18 @@ class Game:
             self._enemies.remove(enemy)
             self._grid[enemy.location[1]][enemy.location[0]] = self.EMPTY_CELL_SYMBOL
 
+    def handlePickupCollection(self, pickup: Pickup) -> None:
+        self.addNotification(f"Picked up {pickup.type.value}")
+        self._pickups.remove(pickup)
+
+        match pickup.type:
+            case PickupType.HEALTH:
+                self.player.heal(1)
+            case PickupType.EXTRA_SCORE:
+                self.player.incrementScore(self.EXTRA_SCORE_INCREMENT)
+            case _:
+                self.player.inventory.append(pickup)
+
     def movePlayer(self, direction: Direction) -> None:
         nextLocation = self.player.getNextLocation(direction)
         if not self.isLocationValid(nextLocation): return
@@ -134,9 +152,7 @@ class Game:
             self._enemies.remove(targetUnit)
             self.player.takeDamage(1)
         elif isinstance(targetUnit, Pickup):
-            self.addNotification(f"Picked up {targetUnit.type.value}")
-            self.player.inventory.append(targetUnit)
-            self._pickups.remove(targetUnit)
+            self.handlePickupCollection(targetUnit)
 
         if self.isBlocked(nextLocation): return
 
@@ -262,6 +278,19 @@ class Game:
         crate = Crate("Crate", (x, 1))
         self._crates.append(crate)
         self._grid[1][x] = crate
+    
+    def tryActivatePickup(self, pickup: Pickup) -> None:
+        match pickup.type:
+            case PickupType.MEGABOMB:
+                self.addNotification("Megabomb activated!")
+                enemiesDestroyed = len(self._enemies)
+                self.player.incrementScore(enemiesDestroyed * self.SCORE_INCREMENT)
+                for enemy in self._enemies:
+                    self._grid[enemy.location[1]][enemy.location[0]] = self.EMPTY_CELL_SYMBOL
+                self._enemies.clear()
+                self.player.inventory.remove(pickup)
+            case _:
+                self.addNotification(f"Cannot activate {pickup.type.value}")
 
     def getScore(self) -> Score:
         return Score(self.player.name, self.player.score, datetime.datetime.now().isoformat())

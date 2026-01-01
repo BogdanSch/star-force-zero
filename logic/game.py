@@ -241,6 +241,10 @@ class Game:
                     self.addNotification("Player was hit by a crate")
                     cratesToRemove.append(crate)
                     self.player.takeDamage(1)
+                elif isinstance(targetUnit, Bullet):
+                    crate.takeDamage(1)
+                    self._bullets.remove(targetUnit)
+                    self._grid[targetLocation[1]][targetLocation[0]] = self.EMPTY_CELL_SYMBOL
                 else:
                     cratesToRemove.append(crate)
             else:
@@ -303,7 +307,7 @@ class Game:
             self._grid[1][x] = enemy
 
     def trySpawnCrate(self):
-        if random.random() > 0.005: return
+        if random.random() > 0.0025: return
 
         x = random.randint(1, self.gridSize[0] - 2)
         if not self.isLocationValid((x, 1)) or self.isBlocked((x, 1)): return
@@ -317,7 +321,7 @@ class Game:
             self.addNotification("Cannot activate this pickup")
             return
 
-        pickup = self.player.inventory[pickupIndex]
+        pickup = self.player.inventory[pickupIndex - 1]
         match pickup.type:
             case PickupType.MEGABOMB:
                 self.addNotification("Megabomb activated!")

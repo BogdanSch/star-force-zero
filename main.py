@@ -246,9 +246,9 @@ def displayInventory(screen: Surface, player: Player, paragraphFont: Font) -> No
 
     inventoryFrequencyList: dict[str, int] = defaultdict(int)
     for item in player.inventory:
-        inventoryFrequencyList[item] += 1
+        inventoryFrequencyList[item.name] += 1
 
-    inventoryString: str = "Inventory: " + (", ".join([f"{index}: {key} = {inventoryFrequencyList[key]}" for (index, key) in enumerate(inventoryFrequencyList.keys())]))
+    inventoryString: str = "Inventory: " + (", ".join([f"[{index + 1}]: {key} x{inventoryFrequencyList[key]}" for (index, key) in enumerate(inventoryFrequencyList.keys())]))
 
     text = paragraphFont.render(inventoryString, True, LIGHT_COLOR)
     textRect = text.get_rect()

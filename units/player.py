@@ -1,18 +1,19 @@
 import time
 from typing import Final
+from units.pickups.pickup import Pickup
 from data.enums.direction import Direction
 from units.unitWithHealth import UnitWithHealth
 
 class Player(UnitWithHealth):
     PLAYER_SYMBOL: Final[str] = '▲'
-    PLAYER_MAX_HEALTH: Final[int] = 3
     fireCountdown: float = .5
 
-    def __init__(self, name: str, location: tuple, speed: int = 1, damage: int = 1, score: int = 0):
-        super().__init__(name, self.PLAYER_SYMBOL, location, speed, self.PLAYER_MAX_HEALTH)
+    def __init__(self, name: str, location: tuple, health: int, speed: int = 1, damage: int = 1, score: int = 0):
+        super().__init__(name, self.PLAYER_SYMBOL, location, speed, health)
         self.score: int = score
         self.damage: int = damage
         self.lastFireTime: float = time.time()
+        self.gunState: str = "active"
         self.inventory: list[Pickup] = []
 
     def incrementScore(self, value: int = 1) -> None:
@@ -31,8 +32,12 @@ class Player(UnitWithHealth):
 
     def canFire(self) -> bool:
         """Checks if the player can attack"""
-        return time.time() - self.lastFireTime > self.fireCountdown
+        isReady: bool = time.time() - self.lastFireTime > self.fireCountdown
+        if isReady:
+            self.gunState = "active"
+        return isReady
 
     def fire(self):
         """Update last fire time when the player shoots."""
+        self.gunState: str = "reloading"
         self.lastFireTime = time.time()

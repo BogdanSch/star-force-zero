@@ -6,5 +6,7 @@ class UnitWithHealth(Unit):
         self.health = health
     def takeDamage(self, damage: int) -> None:
         self.health -= damage
+    def heal(self, amount) -> None:
+        self.health += amount
     def isAlive(self) -> bool:
         return self.health > 0

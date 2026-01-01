@@ -1,23 +1,21 @@
-from collections import defaultdict
 import sys
 import pygame
 import os
 
-from typing import Iterator, Final
-from pygame import Surface
-from pygame.font import Font
 from config import DB_PATH
+from collections import defaultdict
+from typing import Iterator, Final
+from pygame import Surface, Rect
+from pygame.font import Font
+from pygame.time import Clock
 from helpers.button import Button
 from helpers.textInput import TextInput
 from repositories.scoreRepository import ScoreRepository
 from data.score import Score
 from units.player import Player
-from units.bullet import Bullet
-from units.wall import Wall
 from units.pickups.pickup import Pickup
 from logic.game import Game
 from data.enums.direction import Direction
-from data.enums.pickupType import PickupType
 from helpers.timeHelper import formatTimeInSeconds
 from colors import DARK_COLOR, GREY_COLOR, LIGHT_COLOR, RED_COLOR
 
@@ -25,21 +23,21 @@ USERNAME_FILE_PATH: Final[str] = "username.txt"
 
 FRAME_RATE: Final[int] = 30
 GAME_DURATION_IN_SECONDS: Final[int] = 180
-CELL_SIZE: Final[int] = 28
+CELL_SIZE: Final[int] = 23
 TOP_SCORES_LENGTH: Final[int] = 6
 
-SCREEN_WIDTH: Final[int] = 1060
-SCREEN_HEIGHT: Final[int] = 760
+SCREEN_WIDTH: Final[int] = 920
+SCREEN_HEIGHT: Final[int] = 640
 
 CELL_RENDERERS = {
     "Player": lambda screen, rect, images: screen.blit(images["player"], rect),
-    "Enemy":  lambda screen, rect, images: screen.blit(images["enemy"], rect),
-    "Crate":  lambda screen, rect, images: screen.blit(images["crate"], rect),
+    "Enemy": lambda screen, rect, images: screen.blit(images["enemy"], rect),
+    "Crate": lambda screen, rect, images: screen.blit(images["crate"], rect),
     "Heal": lambda screen, rect, images: screen.blit(images["heart"], rect),
     "Megabomb": lambda screen, rect, images: screen.blit(images["megabomb"], rect),
     "Extra Score": lambda screen, rect, images: screen.blit(images["extraScore"], rect),
     "Bullet": lambda screen, rect, images: screen.blit(images["laserBullet"], rect),
-    "Wall":   lambda screen, rect, images: pygame.draw.rect(screen, GREY_COLOR, rect),
+    "Wall": lambda screen, rect, images: pygame.draw.rect(screen, GREY_COLOR, rect),
 }
 
 def displayMainMenuScreen(screen: pygame.Surface, buttonPlaceholderImage: pygame.Surface, titleFont: pygame.font.Font, paragraphFont: pygame.font.Font) -> None:
@@ -54,7 +52,7 @@ def displayMainMenuScreen(screen: pygame.Surface, buttonPlaceholderImage: pygame
         titleRect = title.get_rect(center=(SCREEN_WIDTH / 2, 160))
         screen.blit(title, titleRect)
 
-        text = paragraphFont.render("Welcome to Star Force Zero! Use W/A/S/D or Arrow keys to move. Press the corresponding numeric button to activate a pickup. Press Close to exit the game.", True, LIGHT_COLOR)
+        text = paragraphFont.render("Welcome to Star Force Zero! Use W/A/S/D or Arrow keys to move.\nPress the corresponding numeric button to activate a pickup.\nPress Close to exit the game.", True, LIGHT_COLOR)
         textRect = text.get_rect(center=(SCREEN_WIDTH / 2, 240))
         screen.blit(text, textRect)
 
@@ -73,8 +71,8 @@ def displayMainMenuScreen(screen: pygame.Surface, buttonPlaceholderImage: pygame
                     running = False
         pygame.display.update()
 
-def displayGameOverScreen(screen: pygame.Surface, game: Game, scoreRepository: ScoreRepository, placeholderImages: dict[str, Surface], titleFont: pygame.font.Font, paragraphFont: pygame.font.Font) -> bool:
-    def displayTopScoresTable(topScores: list[Score], screen: Surface, paragraphFont: pygame.font.Font,
+def displayGameOverScreen(screen: Surface, game: Game, scoreRepository: ScoreRepository, placeholderImages: dict[str, Surface], titleFont: pygame.font.Font, paragraphFont: pygame.font.Font) -> bool:
+    def displayTopScoresTable(topScores: list[Score], screen: Surface, paragraphFont: Font,
                               position: tuple[int, int]) -> None:
         header = paragraphFont.render("Top 10 Scores", True, LIGHT_COLOR)
         headerRect = header.get_rect(center=(position[0], position[1]))
@@ -117,7 +115,7 @@ def displayGameOverScreen(screen: pygame.Surface, game: Game, scoreRepository: S
         screen.fill(DARK_COLOR)
         playerMousePosition = pygame.mouse.get_pos()
 
-        title = titleFont.render("Game Over", True, LIGHT_COLOR)
+        title = titleFont.render(game.gameStatus, True, LIGHT_COLOR)
         titleRect = title.get_rect(center=(SCREEN_WIDTH // 2, 80))
         screen.blit(title, titleRect)
 
@@ -184,7 +182,7 @@ def displayGameScreen(game, screen, images: dict[str, Surface], paragraphFont):
     pygame.display.set_caption("Sky Force Zero - Game")
 
     displayGrid(screen, game.grid, images)
-    clock = pygame.time.Clock()
+    clock: Clock = Clock()
     running: bool = True
 
     while running and not game.isGameOver():
@@ -193,9 +191,15 @@ def displayGameScreen(game, screen, images: dict[str, Surface], paragraphFont):
         for event in pygame.event.get():
             if event.type == pygame.QUIT: running = False
             elif event.type == pygame.KEYDOWN:
-                direction = parseUserInput(event)
-                if direction: game.movePlayer(direction)
-                if event.key == pygame.K_SPACE: game.spawnBullet()
+                key = event.key
+                direction = parseUserDirection(key)
+                if direction:
+                    game.movePlayer(direction)
+                if key == pygame.K_SPACE:
+                    game.spawnBullet()
+                if pygame.K_0 <= key <= pygame.K_9:
+                    index: int = key - pygame.K_0
+                    game.tryActivatePickup(index)
 
         game.update()
 
@@ -205,14 +209,14 @@ def displayGameScreen(game, screen, images: dict[str, Surface], paragraphFont):
         pygame.display.flip()
         clock.tick(FRAME_RATE)
 
-def parseUserInput(event: pygame.event.Event) -> Direction | None:
-    if event.key == pygame.K_UP or event.key == pygame.K_w:
+def parseUserDirection(key: int) -> Direction | None:
+    if key == pygame.K_UP or key == pygame.K_w:
         return Direction.UP
-    elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+    elif key == pygame.K_DOWN or key == pygame.K_s:
         return Direction.DOWN
-    elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
+    elif key == pygame.K_LEFT or key == pygame.K_a:
         return Direction.LEFT
-    elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+    elif key == pygame.K_RIGHT or key == pygame.K_d:
         return Direction.RIGHT
     return None
 
@@ -221,32 +225,34 @@ def displayGameStats(screen: Surface, game: Game, paragraphFont: Font) -> None:
     START_Y: Final[int] = 60
     LINE_SPACING: Final[int] = 30
 
-    stats = [
-        f"{game.gameState}",
+    stats = game.notifications
+    stats.extend([
         f"Time left: {formatTimeInSeconds(game.getTimeLeft())}",
         f"Score: {game.player.score}",
         f"Health: {game.player.health}",
-    ]
+    ])
 
     for i, line in enumerate(stats):
         text = paragraphFont.render(line, True, LIGHT_COLOR)
-        text_rect = text.get_rect()
-        text_rect.topright = (SCREEN_WIDTH - PADDING_X, START_Y + i * LINE_SPACING)
-        screen.blit(text, text_rect)
+        textRect = text.get_rect()
+        textRect.topright = (SCREEN_WIDTH - PADDING_X, START_Y + i * LINE_SPACING)
+        screen.blit(text, textRect)
+
+    displayInventory(screen, game.player, paragraphFont)
 
 def displayInventory(screen: Surface, player: Player, paragraphFont: Font) -> None:
     PADDING_X: Final[int] = 20
-    PADDING_Y: Final[int] = 40
+    PADDING_Y: Final[int] = 12
 
     inventoryFrequencyList: dict[str, int] = defaultdict(int)
     for item in player.inventory:
         inventoryFrequencyList[item] += 1
 
-    inventoryString: str = "Inventory: " + (", ".join([f"{index}: {key} = {inventoryFrequencyList[key]}" for (index, key) in enumerate(inventoryFrequencyList)]))
+    inventoryString: str = "Inventory: " + (", ".join([f"{index}: {key} = {inventoryFrequencyList[key]}" for (index, key) in enumerate(inventoryFrequencyList.keys())]))
 
     text = paragraphFont.render(inventoryString, True, LIGHT_COLOR)
     textRect = text.get_rect()
-    textRect.bottomleft = (PADDING_X, PADDING_Y)
+    textRect.bottomleft = (PADDING_X, SCREEN_HEIGHT - PADDING_Y)
     screen.blit(text, textRect)
 
 def displayGrid(screen: Surface, grid: Iterator[list], images: dict[str, Surface]) -> None:
@@ -254,7 +260,6 @@ def displayGrid(screen: Surface, grid: Iterator[list], images: dict[str, Surface
     for y in range(len(matrix)):
         for x in range(len(matrix[y])):
             cell = matrix[y][x]
-            rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
 
             drawer = None
             if isinstance(cell, Pickup):
@@ -262,20 +267,24 @@ def displayGrid(screen: Surface, grid: Iterator[list], images: dict[str, Surface
             else:
                 drawer = CELL_RENDERERS.get(type(cell).__name__)
 
-            if drawer: drawer(screen, rect, images)
+            if drawer: 
+                rect = Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+                drawer(screen, rect, images)
 
 def saveUsername(name: str) -> None:
     with open(USERNAME_FILE_PATH, 'w') as f:
         f.write(name)
+
 def getUsername() -> str:
     if not os.path.exists(USERNAME_FILE_PATH): return ""
     if os.path.getsize(USERNAME_FILE_PATH) == 0: return ""
     with open(USERNAME_FILE_PATH, 'r') as f:
         return f.readline().strip()
 
-def createImage(path: str, size: tuple[int, int] = (CELL_SIZE, CELL_SIZE)) -> pygame.Surface:
+def createImage(path: str, size: tuple[int, int] = (CELL_SIZE, CELL_SIZE)) -> Surface:
     image = pygame.image.load(path).convert_alpha()
     return pygame.transform.scale(image, size)
+
 def createFont(size: int) -> Font:
     return  Font(None, size)
 
@@ -305,7 +314,7 @@ def main() -> None:
     displayMainMenuScreen(screen, placeholderImages["button"], titleFont, paragraphFont)
 
     while True:
-        player = Player(getUsername(), (10, 20))
+        player = Player(getUsername(), (10, 20), 4)
         game = Game(player, (26, 26), GAME_DURATION_IN_SECONDS)
         displayGameScreen(game, screen, objectImages, paragraphFont)
 

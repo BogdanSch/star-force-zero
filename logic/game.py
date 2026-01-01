@@ -24,7 +24,7 @@ class Game:
 
     SCORE_INCREMENT: Final[int] = 20
     EXTRA_SCORE_INCREMENT: Final[int] = 100
-    SCORE_REWARD_FRAMES_INTERVAL: Final[int] = 40
+    SCORE_REWARD_FRAMES_INTERVAL: Final[int] = 30
 
     def __init__(self, player: Player, gridSize: tuple, gameDurationInSeconds: int):
         self.player = player
@@ -43,7 +43,7 @@ class Game:
         self.startTime = time.time()
         self.gameDurationInSeconds = gameDurationInSeconds
 
-        self._enemySpawnInterval = 9.0
+        self._enemySpawnInterval = 8.0
         self._lastEnemySpawnTime = time.time()
         self._frameCounter = 0
 
@@ -76,9 +76,13 @@ class Game:
         return self.startTime + self.gameDurationInSeconds - time.time()
 
     def isGameOver(self) -> bool:
-        if time.time() - self.startTime > self.gameDurationInSeconds or self.player.health <= 0:
+        if self.player.health <= 0:
             self._gameStatus = "Game Over"
             self.addNotification("Game Over", 999)
+            return True
+        elif time.time() - self.startTime > self.gameDurationInSeconds:
+            self._gameStatus = "Victory"
+            self.addNotification("Victory!", 999)
             return True
         return False
 
@@ -89,16 +93,25 @@ class Game:
 
     def isBlocked(self, location: tuple) -> bool:
         unit: Unit | str = self._grid[location[1]][location[0]]
-        return isinstance(unit, (Wall, Bullet, Enemy, Crate))
+        return isinstance(unit, (Wall, Bullet, Enemy, Crate, Pickup, Player))
 
     def isLocationAtLowerBorder(self, location: tuple) -> bool:
         return location[1] == self.gridSize[1] - 1
         
     def addNotification(self, text: str, duration: float = 1.5) -> None:
+        if any(n["text"] == text and n["expiresAt"] > time.time() for n in self._notifications):
+            return
         self._notifications.append({
             "text": text,
             "expiresAt": time.time() + duration
         })
+
+    def _updateUnitPosition(self, unit: Unit, nextLocation: tuple) -> None:
+        currentOccupant = self._grid[unit.location[1]][unit.location[0]]
+        if currentOccupant == unit:
+            self._grid[unit.location[1]][unit.location[0]] = self.EMPTY_CELL_SYMBOL
+        unit.location = nextLocation
+        self._grid[nextLocation[1]][nextLocation[0]] = unit
         
     def moveEnemies(self):
         enemiesToRemove = []
@@ -110,21 +123,30 @@ class Game:
                 continue
 
             targetLocation = enemy.getNextLocation()
-            targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
+            if not self.isLocationValid(targetLocation):
+                continue
 
-            if targetUnit and isinstance(targetUnit, Player):
-                self.addNotification("Player was hit by enemy")
-                enemiesToRemove.append(enemy)
-                self.player.takeDamage(1)
-            elif self.isLocationAtLowerBorder(targetLocation):
-                self.addNotification("Enemy reached the base")
-                enemiesToRemove.append(enemy)
-                self.player.takeDamage(1)
+            if self.isBlocked(targetLocation):
+                targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
+                
+                if targetUnit and isinstance(targetUnit, Player):
+                    self.addNotification("Player was hit by an enemy", 3)
+                    enemiesToRemove.append(enemy)
+                    self.player.takeDamage(1)
+                elif self.isLocationAtLowerBorder(targetLocation):
+                    self.addNotification("Enemy reached the base", 3)
+                    enemiesToRemove.append(enemy)
+                    self.player.takeDamage(1)
+                elif targetUnit and isinstance(targetUnit, Bullet):
+                    enemy.takeDamage(1)
+                    self.player.incrementScore(self.SCORE_INCREMENT)
+                    self._bullets.remove(targetUnit)
+                elif targetUnit and (isinstance(targetUnit, (Crate, Pickup, Enemy))):
+                    continue
+                else:
+                    enemiesToRemove.append(enemy)
             else:
-                if self.isLocationValid(targetLocation) and not self.isBlocked(targetLocation):
-                    self._grid[enemy.location[1]][enemy.location[0]] = self.EMPTY_CELL_SYMBOL
-                    enemy.location = targetLocation
-                    self._grid[enemy.location[1]][enemy.location[0]] = enemy
+                self._updateUnitPosition(enemy, targetLocation)
 
         for enemy in enemiesToRemove:
             self._enemies.remove(enemy)
@@ -135,65 +157,63 @@ class Game:
         self._pickups.remove(pickup)
 
         match pickup.type:
-            case PickupType.HEALTH:
+            case PickupType.HEAL:
                 self.player.heal(1)
             case PickupType.EXTRA_SCORE:
                 self.player.incrementScore(self.EXTRA_SCORE_INCREMENT)
             case _:
                 self.player.inventory.append(pickup)
 
+        self._updateUnitPosition(self.player, pickup.location)
+
     def movePlayer(self, direction: Direction) -> None:
         nextLocation = self.player.getNextLocation(direction)
         if not self.isLocationValid(nextLocation): return
-        targetUnit = self._grid[nextLocation[1]][nextLocation[0]]
 
-        if isinstance(targetUnit, Enemy) and targetUnit.isAlive():
-            self.addNotification("Player was hit by enemy")
-            self._enemies.remove(targetUnit)
-            self.player.takeDamage(1)
-        elif isinstance(targetUnit, Pickup):
-            self.handlePickupCollection(targetUnit)
+        if self.isBlocked(nextLocation):
+            targetUnit = self._grid[nextLocation[1]][nextLocation[0]]
+            if targetUnit and isinstance(targetUnit, Enemy):
+                self.addNotification("Player rammed an enemy!")
+                self.player.takeDamage(1)
+                self.player.incrementScore(self.SCORE_INCREMENT)
 
-        if self.isBlocked(nextLocation): return
+                if targetUnit in self._enemies: self._enemies.remove(targetUnit)
+                self._updateUnitPosition(self.player, nextLocation)
+            elif targetUnit and isinstance(targetUnit, Crate):
+                self.addNotification("Player rammed a crate!")
+                self.player.takeDamage(1)
 
-        self._grid[self.player.location[1]][self.player.location[0]] = self.EMPTY_CELL_SYMBOL
-        self.player.location = nextLocation
-        self._grid[self.player.location[1]][self.player.location[0]] = self.player
+                if targetUnit in self._crates: self._crates.remove(targetUnit)
+                self._updateUnitPosition(self.player, nextLocation)
+            elif targetUnit and isinstance(targetUnit, Pickup):
+                self.handlePickupCollection(targetUnit)
+        else:
+            self._updateUnitPosition(self.player, nextLocation)
 
     def moveBullets(self) -> None:
         bulletsToRemove = []
         for bullet in self._bullets:
+            if not bullet.shouldMove(): continue
+
             targetLocation = bullet.getNextLocation()
             if not self.isLocationValid(targetLocation):
                 bulletsToRemove.append(bullet)
                 continue
-            if not bullet.shouldMove(): continue
 
-            targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
+            if self.isBlocked(targetLocation):
+                targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
 
-            if targetUnit and isinstance(targetUnit, Enemy):
-                bulletsToRemove.append(bullet)
-                targetUnit.takeDamage(1)
-                self.player.incrementScore(self.SCORE_INCREMENT)
-            elif targetUnit and isinstance(targetUnit, Crate):
-                bulletsToRemove.append(bullet)
-                targetUnit.takeDamage(1)
-                if targetUnit.isAlive():
-                    continue
-
-                pickup: Pickup = targetUnit.spawnPickup()
-                pickup.location = targetLocation
-
-                self._pickups.append(pickup)
-                self._crates.remove(targetUnit)
-                self._grid[bullet.location[1]][bullet.location[0]] = self.EMPTY_CELL_SYMBOL
-                self._grid[targetLocation[1]][targetLocation[0]] = pickup
-            elif targetUnit and isinstance(targetUnit, Pickup):
-                bulletsToRemove.append(bullet)
+                if targetUnit and isinstance(targetUnit, Enemy):
+                    bulletsToRemove.append(bullet)
+                    targetUnit.takeDamage(1)
+                    self.player.incrementScore(self.SCORE_INCREMENT)
+                elif targetUnit and isinstance(targetUnit, Crate):
+                    bulletsToRemove.append(bullet)
+                    targetUnit.takeDamage(1)
+                else:
+                    bulletsToRemove.append(bullet)
             else:
-                self._grid[bullet.location[1]][bullet.location[0]] = self.EMPTY_CELL_SYMBOL
-                bullet.location = targetLocation
-                self._grid[bullet.location[1]][bullet.location[0]] = bullet
+                self._updateUnitPosition(bullet, targetLocation)
 
         for bullet in bulletsToRemove:
             self._bullets.remove(bullet)
@@ -204,16 +224,28 @@ class Game:
 
         for crate in self._crates:
             if not crate.shouldMove(): continue
+
             targetLocation = crate.getNextLocation()
-            if self.isLocationAtLowerBorder(targetLocation):
+            if self.isLocationAtLowerBorder(targetLocation) or not self.isLocationValid(targetLocation):
                 cratesToRemove.append(crate)
                 continue
-            if not self.isLocationValid(targetLocation):
+            if not crate.isAlive():
+                pickup: Pickup = crate.spawnPickup()
+                self._pickups.append(pickup)
+                self._grid[pickup.location[1]][pickup.location[0]] = pickup
+                cratesToRemove.append(crate)
                 continue
-
-            self._grid[crate.location[1]][crate.location[0]] = self.EMPTY_CELL_SYMBOL
-            crate.location = targetLocation
-            self._grid[targetLocation[1]][targetLocation[0]] = crate
+            
+            if self.isBlocked(targetLocation):
+                targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
+                if isinstance(targetUnit, Player):
+                    self.addNotification("Player was hit by a crate")
+                    cratesToRemove.append(crate)
+                    self.player.takeDamage(1)
+                else:
+                    cratesToRemove.append(crate)
+            else:
+                self._updateUnitPosition(crate, targetLocation)
 
         for crate in cratesToRemove:
             self._crates.remove(crate)
@@ -223,20 +255,20 @@ class Game:
         self._frameCounter += 1
         if self._frameCounter % self.SCORE_REWARD_FRAMES_INTERVAL == 0:
             self.player.incrementScore()
+
         if self.player.canFire():
-            self.addNotification("Ready to fire", 0.45)
+            self.addNotification("Ready to fire", 0.6)
         else:
             self.addNotification("Reloading", 0.5)
 
         self.trySpawnCrate()
         self.trySpawnEnemies()
         self.moveBullets()
-        self.moveCrates()
         self.moveEnemies()
+        self.moveCrates()
 
     def spawnBullet(self) -> None:
-        if not self.player.canFire():
-            return
+        if not self.player.canFire(): return
 
         bulletLocation = self.player.getNextLocation(Direction.UP)
         if not self.isLocationValid(bulletLocation) or self.isBlocked(bulletLocation):
@@ -256,7 +288,7 @@ class Game:
 
         anchorX = random.randint(1, self.gridSize[0] - 2)
         count = random.randint(1, self.MAX_NUMBER_OF_ENEMIES_TO_SPAWN)
-        possibleOffsets = [-3, -1, 0, 1, 3]
+        possibleOffsets = [-7, -5, -3, -1, 0, 1, 3, 5, 7]
 
         xPositions = []
         for offset in possibleOffsets:
@@ -279,7 +311,12 @@ class Game:
         self._crates.append(crate)
         self._grid[1][x] = crate
     
-    def tryActivatePickup(self, pickup: Pickup) -> None:
+    def tryActivatePickup(self, pickupIndex: int) -> None:
+        if pickupIndex < 0 or pickupIndex >= len(self.player.inventory):
+            self.addNotification("Invalid pickup index")
+            return
+
+        pickup = self.player.inventory[pickupIndex]
         match pickup.type:
             case PickupType.MEGABOMB:
                 self.addNotification("Megabomb activated!")

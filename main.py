@@ -27,7 +27,7 @@ CELL_SIZE: Final[int] = 23
 TOP_SCORES_LENGTH: Final[int] = 6
 
 SCREEN_WIDTH: Final[int] = 920
-SCREEN_HEIGHT: Final[int] = 640
+SCREEN_HEIGHT: Final[int] = 660
 
 CELL_RENDERERS = {
     "Player": lambda screen, rect, images: screen.blit(images["player"], rect),
@@ -242,7 +242,7 @@ def displayGameStats(screen: Surface, game: Game, paragraphFont: Font) -> None:
 
 def displayInventory(screen: Surface, player: Player, paragraphFont: Font) -> None:
     PADDING_X: Final[int] = 20
-    PADDING_Y: Final[int] = 12
+    PADDING_Y: Final[int] = 20
 
     inventoryFrequencyList: dict[str, int] = defaultdict(int)
     for item in player.inventory:

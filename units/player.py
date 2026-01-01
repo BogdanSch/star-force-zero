@@ -13,7 +13,6 @@ class Player(UnitWithHealth):
         self.score: int = score
         self.damage: int = damage
         self.lastFireTime: float = time.time()
-        self.gunState: str = "active"
         self.inventory: list[Pickup] = []
 
     def incrementScore(self, value: int = 1) -> None:
@@ -32,12 +31,8 @@ class Player(UnitWithHealth):
 
     def canFire(self) -> bool:
         """Checks if the player can attack"""
-        isReady: bool = time.time() - self.lastFireTime > self.fireCountdown
-        if isReady:
-            self.gunState = "active"
-        return isReady
+        return time.time() - self.lastFireTime > self.fireCountdown
 
     def fire(self):
         """Update last fire time when the player shoots."""
-        self.gunState: str = "reloading"
         self.lastFireTime = time.time()

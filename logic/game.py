@@ -86,14 +86,13 @@ class Game:
             return True
         return False
 
+    def isBlocked(self, location: tuple) -> bool:
+        return self._grid[location[1]][location[0]] != self.EMPTY_CELL_SYMBOL
+    
     def isLocationValid(self, location: tuple) -> bool:
         if location[0] <= 0 or location[0] >= self.gridSize[0]: return False
         elif location[1] <= 0 or location[1] >= self.gridSize[1]: return False
         return True
-
-    def isBlocked(self, location: tuple) -> bool:
-        unit: Unit | str = self._grid[location[1]][location[0]]
-        return isinstance(unit, (Wall, Bullet, Enemy, Crate, Pickup, Player))
 
     def isLocationAtLowerBorder(self, location: tuple) -> bool:
         return location[1] == self.gridSize[1] - 1
@@ -141,6 +140,7 @@ class Game:
                     enemy.takeDamage(1)
                     self.player.incrementScore(self.SCORE_INCREMENT)
                     self._bullets.remove(targetUnit)
+                    self._grid[targetLocation[1]][targetLocation[0]] = self.EMPTY_CELL_SYMBOL
                 elif targetUnit and (isinstance(targetUnit, (Crate, Pickup, Enemy))):
                     continue
                 else:
@@ -176,14 +176,12 @@ class Game:
                 self.addNotification("Player rammed an enemy!")
                 self.player.takeDamage(1)
                 self.player.incrementScore(self.SCORE_INCREMENT)
-
-                if targetUnit in self._enemies: self._enemies.remove(targetUnit)
+                self._enemies.remove(targetUnit)
                 self._updateUnitPosition(self.player, nextLocation)
             elif targetUnit and isinstance(targetUnit, Crate):
                 self.addNotification("Player rammed a crate!")
                 self.player.takeDamage(1)
-
-                if targetUnit in self._crates: self._crates.remove(targetUnit)
+                self._crates.remove(targetUnit)
                 self._updateUnitPosition(self.player, nextLocation)
             elif targetUnit and isinstance(targetUnit, Pickup):
                 self.handlePickupCollection(targetUnit)
@@ -234,8 +232,9 @@ class Game:
                 self._pickups.append(pickup)
                 self._grid[pickup.location[1]][pickup.location[0]] = pickup
                 cratesToRemove.append(crate)
+                crate.location = None
                 continue
-            
+
             if self.isBlocked(targetLocation):
                 targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
                 if isinstance(targetUnit, Player):
@@ -249,7 +248,8 @@ class Game:
 
         for crate in cratesToRemove:
             self._crates.remove(crate)
-            self._grid[crate.location[1]][crate.location[0]] = self.EMPTY_CELL_SYMBOL
+            if crate.location is not None:
+                self._grid[crate.location[1]][crate.location[0]] = self.EMPTY_CELL_SYMBOL
 
     def update(self) -> None:
         self._frameCounter += 1
@@ -257,9 +257,9 @@ class Game:
             self.player.incrementScore()
 
         if self.player.canFire():
-            self.addNotification("Ready to fire", 0.6)
+            self.addNotification("Ready to fire", 1)
         else:
-            self.addNotification("Reloading", 0.5)
+            self.addNotification("Reloading", 0.4)
 
         self.trySpawnCrate()
         self.trySpawnEnemies()
@@ -272,6 +272,7 @@ class Game:
 
         bulletLocation = self.player.getNextLocation(Direction.UP)
         if not self.isLocationValid(bulletLocation) or self.isBlocked(bulletLocation):
+            self.addNotification("Cannot fire: Path blocked", 2)
             return
 
         self.player.fire()
@@ -302,7 +303,7 @@ class Game:
             self._grid[1][x] = enemy
 
     def trySpawnCrate(self):
-        if random.random() > 10e-4 / 1.5: return
+        if random.random() > 0.005: return
 
         x = random.randint(1, self.gridSize[0] - 2)
         if not self.isLocationValid((x, 1)) or self.isBlocked((x, 1)): return
@@ -312,8 +313,8 @@ class Game:
         self._grid[1][x] = crate
     
     def tryActivatePickup(self, pickupIndex: int) -> None:
-        if pickupIndex < 0 or pickupIndex >= len(self.player.inventory):
-            self.addNotification("Invalid pickup index")
+        if pickupIndex < 1 or pickupIndex > len(self.player.inventory):
+            self.addNotification("Cannot activate this pickup")
             return
 
         pickup = self.player.inventory[pickupIndex]

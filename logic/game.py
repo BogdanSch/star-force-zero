@@ -153,8 +153,11 @@ class Game:
             self._grid[enemy.location[1]][enemy.location[0]] = self.EMPTY_CELL_SYMBOL
 
     def handlePickupCollection(self, pickup: Pickup) -> None:
-        self.addNotification(f"Picked up {pickup.type.value}")
         self._pickups.remove(pickup)
+        if self.player.isInventoryFull():
+            self.addNotification(f"Can't add {pickup.type.value}. The inventory is full.")
+            return
+
 
         match pickup.type:
             case PickupType.HEAL:
@@ -162,11 +165,17 @@ class Game:
             case PickupType.EXTRA_SCORE:
                 self.player.incrementScore(self.EXTRA_SCORE_INCREMENT)
             case _:
-                self.player.inventory.append(pickup)
+                try:
+                    self.player.addItem(pickup)
+                    self.addNotification(f"Picked up {pickup.type.value}")
+                except RuntimeError as e:
+                    self.addNotification(str(e))
 
         self._updateUnitPosition(self.player, pickup.location)
 
     def movePlayer(self, direction: Direction) -> None:
+        if self.isGameOver(): return
+
         nextLocation = self.player.getNextLocation(direction)
         if not self.isLocationValid(nextLocation): return
 
@@ -317,11 +326,12 @@ class Game:
         self._grid[1][x] = crate
     
     def tryActivatePickup(self, pickupIndex: int) -> None:
-        if pickupIndex < 1 or pickupIndex > len(self.player.inventory):
-            self.addNotification("Cannot activate this pickup")
+        try:
+            pickup = self.player.getItemByIndex(pickupIndex)
+        except IndexError as e:
+            self.addNotification(str(e))
             return
 
-        pickup = self.player.inventory[pickupIndex - 1]
         match pickup.type:
             case PickupType.MEGABOMB:
                 self.addNotification("Megabomb activated!")

@@ -23,11 +23,12 @@ USERNAME_FILE_PATH: Final[str] = "username.txt"
 
 FRAME_RATE: Final[int] = 30
 GAME_DURATION_IN_SECONDS: Final[int] = 180
-CELL_SIZE: Final[int] = 23
+GAME_FIELD_SIZE: Final[int] = 26
+CELL_SIZE: Final[int] = 24
 TOP_SCORES_LENGTH: Final[int] = 6
 
-SCREEN_WIDTH: Final[int] = 920
-SCREEN_HEIGHT: Final[int] = 660
+SCREEN_WIDTH: Final[int] = 1280
+SCREEN_HEIGHT: Final[int] = 720
 
 CELL_RENDERERS = {
     "Player": lambda screen, rect, images: screen.blit(images["player"], rect),
@@ -71,7 +72,7 @@ def displayMainMenuScreen(screen: pygame.Surface, buttonPlaceholderImage: pygame
                     running = False
         pygame.display.update()
 
-def displayGameOverScreen(screen: Surface, game: Game, scoreRepository: ScoreRepository, placeholderImages: dict[str, Surface], titleFont: pygame.font.Font, paragraphFont: pygame.font.Font) -> bool:
+def displayGameOverScreen(screen: Surface, game: Game, scoreRepository: ScoreRepository, gameImages: dict[str, Surface], titleFont: pygame.font.Font, paragraphFont: pygame.font.Font) -> bool:
     def displayTopScoresTable(topScores: list[Score], screen: Surface, paragraphFont: Font,
                               position: tuple[int, int]) -> None:
         header = paragraphFont.render("Top 10 Scores", True, LIGHT_COLOR)
@@ -109,7 +110,7 @@ def displayGameOverScreen(screen: Surface, game: Game, scoreRepository: ScoreRep
 
     saveProgressText: str = "Enter your name to save the results"
     saveResultButton = Button((SCREEN_WIDTH // 2 + 148, 260), "Save", paragraphFont,
-                              baseColor=DARK_COLOR, hoveringColor=GREY_COLOR, image=placeholderImages["button"])
+                              baseColor=DARK_COLOR, hoveringColor=GREY_COLOR, image=gameImages["button"])
 
     while running:
         screen.fill(DARK_COLOR)
@@ -128,7 +129,7 @@ def displayGameOverScreen(screen: Surface, game: Game, scoreRepository: ScoreRep
         screen.blit(text, textRect)
 
         if not isSaved:
-            usernameInput = TextInput((SCREEN_WIDTH // 2 - 120, 260), userText, "Enter your username", paragraphFont, baseColor=DARK_COLOR, image=placeholderImages["input"])
+            usernameInput = TextInput((SCREEN_WIDTH // 2 - 120, 260), userText, "Enter your username", paragraphFont, baseColor=DARK_COLOR, image=gameImages["input"])
             usernameInput.update(screen)
             if userTextError:
                 errorText = paragraphFont.render(userTextError, True, RED_COLOR)
@@ -142,7 +143,7 @@ def displayGameOverScreen(screen: Surface, game: Game, scoreRepository: ScoreRep
         textRect = text.get_rect(center=(SCREEN_WIDTH // 2, 360))
         screen.blit(text, textRect)
 
-        playAgainButton = Button((SCREEN_WIDTH // 2, 408), "Play Again", paragraphFont, image=placeholderImages["button"],
+        playAgainButton = Button((SCREEN_WIDTH // 2, 408), "Play Again", paragraphFont, image=gameImages["button"],
             baseColor=DARK_COLOR, hoveringColor=GREY_COLOR)
         playAgainButton.changeColor(playerMousePosition)
         playAgainButton.update(screen)
@@ -178,7 +179,7 @@ def displayGameOverScreen(screen: Surface, game: Game, scoreRepository: ScoreRep
 
     return False
 
-def displayGameScreen(game, screen, images: dict[str, Surface], paragraphFont):
+def displayGameScreen(game, screen, images: dict[str, Surface], backgroundImage: Surface, paragraphFont):
     pygame.display.set_caption("Sky Force Zero - Game")
 
     displayGrid(screen, game.grid, images)
@@ -187,6 +188,7 @@ def displayGameScreen(game, screen, images: dict[str, Surface], paragraphFont):
 
     while running and not game.isGameOver():
         screen.fill(DARK_COLOR)
+        screen.blit(backgroundImage, (0, 0))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT: running = False
@@ -221,6 +223,23 @@ def parseUserDirection(key: int) -> Direction | None:
     return None
 
 def displayGameStats(screen: Surface, game: Game, paragraphFont: Font) -> None:
+    def displayInventory(screen: Surface, player: Player, paragraphFont: Font) -> None:
+        PADDING_X: Final[int] = 20
+        PADDING_Y: Final[int] = 20
+
+        inventoryFrequencyList: dict[str, int] = defaultdict(int)
+        for item in player.inventory:
+            inventoryFrequencyList[item.name] += 1
+
+        inventoryString: str = "Inventory: " + (", ".join(
+            [f"[{index + 1}]: {key} x{inventoryFrequencyList[key]}" for (index, key) in
+             enumerate(inventoryFrequencyList.keys())]))
+
+        text = paragraphFont.render(inventoryString, True, LIGHT_COLOR)
+        textRect = text.get_rect()
+        textRect.bottomleft = (PADDING_X, SCREEN_HEIGHT - PADDING_Y)
+        screen.blit(text, textRect)
+
     PADDING_X: Final[int] = 20
     START_Y: Final[int] = 60
     LINE_SPACING: Final[int] = 30
@@ -239,21 +258,6 @@ def displayGameStats(screen: Surface, game: Game, paragraphFont: Font) -> None:
         screen.blit(text, textRect)
 
     displayInventory(screen, game.player, paragraphFont)
-
-def displayInventory(screen: Surface, player: Player, paragraphFont: Font) -> None:
-    PADDING_X: Final[int] = 20
-    PADDING_Y: Final[int] = 20
-
-    inventoryFrequencyList: dict[str, int] = defaultdict(int)
-    for item in player.inventory:
-        inventoryFrequencyList[item.name] += 1
-
-    inventoryString: str = "Inventory: " + (", ".join([f"[{index + 1}]: {key} x{inventoryFrequencyList[key]}" for (index, key) in enumerate(inventoryFrequencyList.keys())]))
-
-    text = paragraphFont.render(inventoryString, True, LIGHT_COLOR)
-    textRect = text.get_rect()
-    textRect.bottomleft = (PADDING_X, SCREEN_HEIGHT - PADDING_Y)
-    screen.blit(text, textRect)
 
 def displayGrid(screen: Surface, grid: Iterator[list], images: dict[str, Surface]) -> None:
     matrix = list(grid)
@@ -305,20 +309,21 @@ def main() -> None:
         "laserBullet": createImage("./assets/laser-bullet.png"),
         "heart": createImage("./assets/pickups/heart.png"),
         "extraScore": createImage("./assets/pickups/pixel-star.png"),
-        "megabomb": createImage("./assets/pickups/megabomb.png")
+        "megabomb": createImage("./assets/pickups/megabomb.png"),
     }
-    placeholderImages: dict[str, Surface] = {
+    gameImages: dict[str, Surface] = {
         "input": createImage("./assets/input-placeholder.png", (320, 180)),
-        "button": createImage("./assets/button-placeholder.png", (280, 160))
+        "button": createImage("./assets/button-placeholder.png", (280, 160)),
+        "background": createImage("./assets/backgrounds/bg1.gif", (GAME_FIELD_SIZE * CELL_SIZE, GAME_FIELD_SIZE * CELL_SIZE))
     }
-    displayMainMenuScreen(screen, placeholderImages["button"], titleFont, paragraphFont)
+    displayMainMenuScreen(screen, gameImages["button"], titleFont, paragraphFont)
 
     while True:
         player = Player(getUsername(), (10, 20), 4)
-        game = Game(player, (26, 26), GAME_DURATION_IN_SECONDS)
-        displayGameScreen(game, screen, objectImages, paragraphFont)
+        game = Game(player, (GAME_FIELD_SIZE, GAME_FIELD_SIZE), GAME_DURATION_IN_SECONDS)
+        displayGameScreen(game, screen, objectImages, gameImages["background"], paragraphFont)
 
-        isGameContinued = displayGameOverScreen(screen, game, scoreRepository, placeholderImages, titleFont, paragraphFont)
+        isGameContinued = displayGameOverScreen(screen, game, scoreRepository, gameImages, titleFont, paragraphFont)
         if not isGameContinued: break
 
     pygame.quit()

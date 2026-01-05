@@ -26,11 +26,13 @@ class Game:
     EXTRA_SCORE_INCREMENT: Final[int] = 100
     SCORE_REWARD_FRAMES_INTERVAL: Final[int] = 30
 
+    __slots__ = ["player", "gridSize", "_grid", "_enemies", "_bullets", "_crates", "_pickups", "_gameStatus", "_notifications", "startTime", "gameDurationInSeconds", "_enemySpawnInterval", "_lastEnemySpawnTime", "_frameCounter"]
+
     def __init__(self, player: Player, gridSize: tuple, gameDurationInSeconds: int):
         self.player = player
         self.gridSize = gridSize
 
-        self._grid: list[Unit | str] = []
+        self._grid: list[list[Unit | str]] = []
         self.initializeGrid()
 
         self._enemies: list[Enemy] = []
@@ -69,7 +71,7 @@ class Game:
         return self._gameStatus
 
     @property
-    def notifications(self) -> list[dict]:
+    def notifications(self) -> list[str]:
         return [n["text"] for n in self._notifications if n["expiresAt"] > time.time()]
 
     def getTimeLeft(self) -> float:
@@ -241,7 +243,8 @@ class Game:
                 self._pickups.append(pickup)
                 self._grid[pickup.location[1]][pickup.location[0]] = pickup
                 cratesToRemove.append(crate)
-                crate.location = None
+                crate.remove()
+                # crate.location = None
                 continue
 
             if self.isBlocked(targetLocation):
@@ -261,7 +264,7 @@ class Game:
 
         for crate in cratesToRemove:
             self._crates.remove(crate)
-            if crate.location is not None:
+            if not crate.isRemoved:
                 self._grid[crate.location[1]][crate.location[0]] = self.EMPTY_CELL_SYMBOL
 
     def update(self) -> None:

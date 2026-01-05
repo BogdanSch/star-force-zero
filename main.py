@@ -128,6 +128,7 @@ def displayGameOverScreen(screen: Surface, game: Game, scoreRepository: ScoreRep
         textRect = text.get_rect(center=(SCREEN_WIDTH // 2, 200))
         screen.blit(text, textRect)
 
+        usernameInput: TextInput | None = None
         if not isSaved:
             usernameInput = TextInput((SCREEN_WIDTH // 2 - 120, 260), userText, "Enter your username", paragraphFont, baseColor=DARK_COLOR, image=gameImages["input"])
             usernameInput.update(screen)
@@ -161,7 +162,7 @@ def displayGameOverScreen(screen: Surface, game: Game, scoreRepository: ScoreRep
                     running = False
                     return True
                 elif saveResultButton.checkForInput(playerMousePosition):
-                    if usernameInput.isEmpty(): 
+                    if usernameInput and usernameInput.isEmpty(): 
                         userTextError = "Username cannot be empty!"
                         continue
                     saveResultButton.isEnabled = False
@@ -199,7 +200,7 @@ def displayGameScreen(game, screen, images: dict[str, Surface], backgroundImage:
                     game.movePlayer(direction)
                 if key == pygame.K_SPACE:
                     game.spawnBullet()
-                if pygame.K_0 <= key <= pygame.K_9:
+                if pygame.K_0 < key <= pygame.K_9:
                     index: int = key - pygame.K_0
                     game.tryActivatePickup(index)
 
@@ -244,7 +245,7 @@ def displayGameStats(screen: Surface, game: Game, paragraphFont: Font) -> None:
     START_Y: Final[int] = 60
     LINE_SPACING: Final[int] = 30
 
-    stats = game.notifications
+    stats: list[str] = game.notifications
     stats.extend([
         f"Time left: {formatTimeInSeconds(game.getTimeLeft())}",
         f"Score: {game.player.score}",

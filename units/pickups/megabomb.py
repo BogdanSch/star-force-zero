@@ -19,7 +19,6 @@ class Megabomb(Pickup):
         game.addNotification("Megabomb activated!")
         enemiesDestroyed = len(game._enemies)
         game.player.incrementScore(enemiesDestroyed * game.SCORE_INCREMENT)
-        for enemy in game._enemies:
-            game._grid[enemy.location.y][enemy.location.x] = game.EMPTY_CELL_SYMBOL
-            game._enemies.clear()
+        for enemy in game._enemies[:]:
+            game.killUnit(enemy)
         game.player.inventory.remove(self)

@@ -13,6 +13,7 @@ from units.bullet import Bullet
 from units.pickups.crate import Crate
 from units.pickups.pickup import Pickup
 from data.enums.direction import Direction
+from data.enums.entity import Entity
 
 if TYPE_CHECKING:
     from units.player import Player
@@ -104,22 +105,37 @@ class Game:
         currentOccupant = self._grid.getOccupyingUnit(unit.location)
         if currentOccupant == unit:
             self._grid.setOccupyingUnit(unit.location, self.EMPTY_CELL_SYMBOL)
-
-        if isinstance(unit, Enemy):
-            if unit in self._enemies:
-                self._enemies.remove(unit)
-        elif isinstance(unit, Bullet):
-            if unit in self._bullets:
-                self._bullets.remove(unit)
-        elif isinstance(unit, Pickup):
-            if unit in self._pickups:
-                self._pickups.remove(unit)
-        elif isinstance(unit, Crate):
-            if unit in self._crates:
-                self._crates.remove(unit)
+        
+        match unit.entityType:
+            case Entity.ENEMY:
+                if unit in self._enemies:
+                    self._enemies.remove(unit)
+            case Entity.BULLET:
+                if unit in self._bullets:
+                    self._bullets.remove(unit)
+            case Entity.CRATE:
+                if unit in self._crates:
+                    self._crates.remove(unit)
+                if not spawnPickup: return
+                
                 pickup: Pickup = unit.spawnPickup()
                 self._pickups.append(pickup)
                 self._grid.setOccupyingUnit(pickup.location, pickup)
+        # if isinstance(unit, Enemy):
+            
+        # elif isinstance(unit, Bullet):
+            
+        # elif isinstance(unit, Pickup):
+        #     if unit in self._pickups:
+        #         self._pickups.remove(unit)
+        # elif isinstance(unit, Crate):
+        # if unit in self._crates:
+        #             self._crates.remove(unit)
+        #         if not spawnPickup: return
+                
+        #         pickup: Pickup = unit.spawnPickup()
+        #         self._pickups.append(pickup)
+        #         self._grid.setOccupyingUnit(pickup.location, pickup)
         
     def moveEnemies(self):
         enemiesToRemove = []
@@ -146,28 +162,6 @@ class Game:
                     self._updateUnitPosition(enemy, targetLocation)
             else:
                 self._updateUnitPosition(enemy, targetLocation)
-            # if self._grid.isBlocked(targetLocation):
-            #     targetUnit = self._grid.getOccupyingUnit(targetLocation)
-
-            #     if targetUnit and isinstance(targetUnit, Player):
-            #         self.addNotification("Player was hit by an enemy", 3)
-            #         enemiesToRemove.append(enemy)
-            #         self.player.takeDamage(1)
-            #     elif self._grid.isLocationAtLowerBorder(targetLocation):
-            #         self.addNotification("Enemy reached the base", 3)
-            #         enemiesToRemove.append(enemy)
-            #         self.player.takeDamage(1)
-            #     elif targetUnit and isinstance(targetUnit, Bullet):
-            #         enemy.takeDamage(1)
-            #         self.player.incrementScore(self.SCORE_INCREMENT)
-            #         self._bullets.remove(targetUnit)
-            #         self._grid.setOccupyingUnit(targetLocation, self.EMPTY_CELL_SYMBOL)
-            #     elif targetUnit and (isinstance(targetUnit, (Crate, Pickup, Enemy))):
-            #         continue
-            #     else:
-            #         enemiesToRemove.append(enemy)
-            # else:
-            #     self._updateUnitPosition(enemy, targetLocation)
 
         for enemy in enemiesToRemove:
             if enemy in self._enemies:
@@ -198,22 +192,6 @@ class Game:
         else:
             self._updateUnitPosition(self.player, nextLocation)
 
-            # if targetUnit and isinstance(targetUnit, Enemy):
-            #     self.addNotification("Player rammed an enemy!")
-            #     self.player.takeDamage(1)
-            #     self.player.incrementScore(self.SCORE_INCREMENT)
-            #     self._enemies.remove(targetUnit)
-            #     self._updateUnitPosition(self.player, nextLocation)
-            # elif targetUnit and isinstance(targetUnit, Crate):
-            #     self.addNotification("Player rammed a crate!")
-            #     self.player.takeDamage(1)
-            #     self._crates.remove(targetUnit)
-            #     self._updateUnitPosition(self.player, nextLocation)
-            # elif targetUnit and isinstance(targetUnit, Pickup):
-            #     self.handlePickupCollection(targetUnit)
-        # else:
-        #     self._updateUnitPosition(self.player, nextLocation)
-
     def moveBullets(self) -> None:
         bulletsToRemove = []
         for bullet in self._bullets:
@@ -234,20 +212,6 @@ class Game:
                     bulletsToRemove.append(bullet)
             else:
                 self._updateUnitPosition(bullet, targetLocation)
-                
-            # if self._grid.isBlocked(targetLocation):
-
-            #     if targetUnit and isinstance(targetUnit, Enemy):
-            #         bulletsToRemove.append(bullet)
-            #         targetUnit.takeDamage(1)
-            #         self.player.incrementScore(self.SCORE_INCREMENT)
-            #     elif targetUnit and isinstance(targetUnit, Crate):
-            #         bulletsToRemove.append(bullet)
-            #         targetUnit.takeDamage(1)
-            #     else:
-            #         bulletsToRemove.append(bullet)
-            # else:
-            #     self._updateUnitPosition(bullet, targetLocation)
 
         for bullet in bulletsToRemove:
             if bullet in self._bullets:
@@ -279,20 +243,6 @@ class Game:
                     self._updateUnitPosition(crate, targetLocation)
             else:
                 self._updateUnitPosition(crate, targetLocation)
-            # if self._grid.isBlocked(targetLocation):
-            #     targetUnit = self._grid.getOccupyingUnit(targetLocation)
-            #     if isinstance(targetUnit, Player):
-            #         self.addNotification("Player was hit by a crate")
-            #         cratesToRemove.append(crate)
-            #         self.player.takeDamage(1)
-            #     elif isinstance(targetUnit, Bullet):
-            #         crate.takeDamage(1)
-            #         self._bullets.remove(targetUnit)
-            #         self._grid.setOccupyingUnit(targetLocation, self.EMPTY_CELL_SYMBOL)
-            #     else:
-            #         cratesToRemove.append(crate)
-            # else:
-            #     self._updateUnitPosition(crate, targetLocation)
 
         for crate in cratesToRemove:
             if crate in self._crates:

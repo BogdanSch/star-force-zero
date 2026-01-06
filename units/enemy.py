@@ -28,11 +28,9 @@ class Enemy(UnitWithHealth, Disposable):
     def onHitByPlayer(self, game: 'Game') -> bool:
         game.addNotification("Player rammed Enemy!")
         game.player.takeDamage(1)
-        game.player.incrementScore(game.SCORE_INCREMENT)
-        self.takeDamage(self.health)
-        if not self.isAlive():
-            game.killUnit(self)
-        return False
+        game.player.incrementScore(2 * game.SCORE_INCREMENT)
+        game.killUnit(self)
+        return True
 
     def onHitByBullet(self, bullet: 'Bullet', game: 'Game') -> bool:
         self.takeDamage(1)

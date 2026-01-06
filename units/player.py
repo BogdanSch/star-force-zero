@@ -70,13 +70,9 @@ class Player(UnitWithHealth, Disposable):
     
     def onHitByEnemy(self, enemy: 'Enemy', game: 'Game') -> bool:
         game.addNotification("Player was hit by an enemy", 3)
-        enemy.takeDamage(1)
-        game.player.incrementScore(game.SCORE_INCREMENT)
-        
-        game.killUnit(self) 
-        if not enemy.isAlive():
-            game.killUnit(enemy)
-        return True
+        game.player.incrementScore(2 * game.SCORE_INCREMENT)
+        game.killUnit(enemy)
+        return False
     
     def onHitByCrate(self, crate: 'Crate', game: 'Game') -> bool:
         game.addNotification("Player rammed a crate!")
@@ -84,6 +80,6 @@ class Player(UnitWithHealth, Disposable):
         self.takeDamage(1)
         
         if not crate.isAlive():
-            game.killUnit(crate)
+            game.killUnit(crate, False)
             return True
         return False

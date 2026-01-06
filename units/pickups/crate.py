@@ -42,7 +42,7 @@ class Crate(UnitWithHealth, Disposable):
         game.addNotification("Player rammed a crate!", 2)
         game.player.takeDamage(1)
         game.killUnit(self, False)
-        return True
+        return False
 
     def onHitByBullet(self, bullet: 'Bullet', game: 'Game') -> bool:
         self.takeDamage(1)

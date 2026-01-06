@@ -1,7 +1,8 @@
 from data.enums.entity import Entity
+from helpers.location import Location
 
 class Unit:
-    def __init__(self, name: str, symbol: str, entityType: Entity, location: tuple = (0, 0), speed: int = 0):
+    def __init__(self, name: str, symbol: str, entityType: Entity, location: Location = Location(0, 0), speed: int = 0):
         self.name = name
         self.symbol = symbol
         self.entityType = entityType

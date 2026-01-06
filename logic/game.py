@@ -3,6 +3,8 @@ import random
 import time
 
 from typing import Final, Iterator
+from helpers.grid import Grid
+from helpers.location import Location
 from repositories.scoreRepository import ScoreRepository
 from data.score import Score
 from units.unit import Unit
@@ -27,12 +29,12 @@ class Game:
 
     __slots__ = ["player", "gridSize", "_grid", "_enemies", "_bullets", "_crates", "_pickups", "_gameStatus", "_notifications", "startTime", "gameDurationInSeconds", "_enemySpawnInterval", "_lastEnemySpawnTime", "_frameCounter"]
 
-    def __init__(self, player: Player, gridSize: tuple, gameDurationInSeconds: int):
+    def __init__(self, player: Player, gridSize: tuple[int, int], gameDurationInSeconds: int):
         self.player = player
         self.gridSize = gridSize
 
-        self._grid: list[list[Unit | str]] = []
-        self.initializeGrid()
+        self._grid: Grid = Grid(gridSize, self)
+        # self.initializeGrid()
 
         self._enemies: list[Enemy] = []
         self._bullets: list[Bullet] = []
@@ -48,22 +50,9 @@ class Game:
         self._lastEnemySpawnTime = time.time()
         self._frameCounter = 0
 
-    def initializeGrid(self):
-        for y in range(self.gridSize[1]):
-            row = []
-            for x in range(self.gridSize[0]):
-                if y == 0 or y == self.gridSize[1] - 1 or x == 0 or x == self.gridSize[0] - 1:
-                    row.append(Wall((x, y)))
-                elif (x, y) == self.player.location:
-                    row.append(self.player)
-                else:
-                    row.append(self.EMPTY_CELL_SYMBOL)
-            self._grid.append(row)
-
     @property
     def grid(self) -> Iterator[list]:
-        for row in self._grid:
-            yield row
+        return self._grid.grid
 
     @property
     def gameStatus(self) -> str:
@@ -91,17 +80,6 @@ class Game:
             return True
         return False
 
-    def isBlocked(self, location: tuple) -> bool:
-        return self._grid[location[1]][location[0]] != self.EMPTY_CELL_SYMBOL
-    
-    def isLocationValid(self, location: tuple) -> bool:
-        if location[0] <= 0 or location[0] >= self.gridSize[0]: return False
-        elif location[1] <= 0 or location[1] >= self.gridSize[1]: return False
-        return True
-
-    def isLocationAtLowerBorder(self, location: tuple) -> bool:
-        return location[1] == self.gridSize[1] - 1
-        
     def addNotification(self, text: str, duration: float = 1.5) -> None:
         if any(n["text"] == text and n["expiresAt"] > time.time() for n in self._notifications):
             return
@@ -110,12 +88,12 @@ class Game:
             "expiresAt": time.time() + duration
         })
 
-    def _updateUnitPosition(self, unit: Unit, nextLocation: tuple) -> None:
-        currentOccupant = self._grid[unit.location[1]][unit.location[0]]
+    def _updateUnitPosition(self, unit: Unit, nextLocation: Location) -> None:
+        currentOccupant = self._grid.getOccupyingUnit(unit.location)
         if currentOccupant == unit:
-            self._grid[unit.location[1]][unit.location[0]] = self.EMPTY_CELL_SYMBOL
+            self._grid.setOccupyingUnit(unit.location, self.EMPTY_CELL_SYMBOL)
         unit.location = nextLocation
-        self._grid[nextLocation[1]][nextLocation[0]] = unit
+        self._grid.setOccupyingUnit(nextLocation, unit)
         
     def moveEnemies(self):
         enemiesToRemove = []
@@ -127,18 +105,18 @@ class Game:
                 continue
 
             targetLocation = enemy.getNextLocation()
-            if not self.isLocationValid(targetLocation):
+            if not self._grid.isLocationValid(targetLocation):
                 continue
 
-            if self.isBlocked(targetLocation):
-                targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
-                
+            if self._grid.isBlocked(targetLocation):
+                targetUnit = self._grid.getOccupyingUnit(targetLocation)
+
                 # Replace with entity
                 if targetUnit and isinstance(targetUnit, Player):
                     self.addNotification("Player was hit by an enemy", 3)
                     enemiesToRemove.append(enemy)
                     self.player.takeDamage(1)
-                elif self.isLocationAtLowerBorder(targetLocation):
+                elif self._grid.isLocationAtLowerBorder(targetLocation):
                     self.addNotification("Enemy reached the base", 3)
                     enemiesToRemove.append(enemy)
                     self.player.takeDamage(1)
@@ -146,7 +124,7 @@ class Game:
                     enemy.takeDamage(1)
                     self.player.incrementScore(self.SCORE_INCREMENT)
                     self._bullets.remove(targetUnit)
-                    self._grid[targetLocation[1]][targetLocation[0]] = self.EMPTY_CELL_SYMBOL
+                    self._grid.setOccupyingUnit(targetLocation, self.EMPTY_CELL_SYMBOL)
                 elif targetUnit and (isinstance(targetUnit, (Crate, Pickup, Enemy))):
                     continue
                 else:
@@ -156,7 +134,7 @@ class Game:
 
         for enemy in enemiesToRemove:
             self._enemies.remove(enemy)
-            self._grid[enemy.location[1]][enemy.location[0]] = self.EMPTY_CELL_SYMBOL
+            self._grid.setOccupyingUnit(enemy.location, self.EMPTY_CELL_SYMBOL)
 
     def handlePickupCollection(self, pickup: Pickup) -> None:
         self._pickups.remove(pickup)
@@ -172,10 +150,10 @@ class Game:
         if self.isGameOver(): return
 
         nextLocation = self.player.getNextLocation(direction)
-        if not self.isLocationValid(nextLocation): return
+        if not self._grid.isLocationValid(nextLocation): return
 
-        if self.isBlocked(nextLocation):
-            targetUnit = self._grid[nextLocation[1]][nextLocation[0]]
+        if self._grid.isBlocked(nextLocation):
+            targetUnit = self._grid.getOccupyingUnit(nextLocation)
             if targetUnit and isinstance(targetUnit, Enemy):
                 self.addNotification("Player rammed an enemy!")
                 self.player.takeDamage(1)
@@ -198,12 +176,12 @@ class Game:
             if not bullet.shouldMove(): continue
 
             targetLocation = bullet.getNextLocation()
-            if not self.isLocationValid(targetLocation):
+            if not self._grid.isLocationValid(targetLocation):
                 bulletsToRemove.append(bullet)
                 continue
 
-            if self.isBlocked(targetLocation):
-                targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
+            if self._grid.isBlocked(targetLocation):
+                targetUnit = self._grid.getOccupyingUnit(targetLocation)
 
                 if targetUnit and isinstance(targetUnit, Enemy):
                     bulletsToRemove.append(bullet)
@@ -219,7 +197,7 @@ class Game:
 
         for bullet in bulletsToRemove:
             self._bullets.remove(bullet)
-            self._grid[bullet.location[1]][bullet.location[0]] = self.EMPTY_CELL_SYMBOL
+            self._grid.setOccupyingUnit(bullet.location, self.EMPTY_CELL_SYMBOL)
 
     def moveCrates(self) -> None:
         cratesToRemove = []
@@ -228,20 +206,19 @@ class Game:
             if not crate.shouldMove(): continue
 
             targetLocation = crate.getNextLocation()
-            if self.isLocationAtLowerBorder(targetLocation) or not self.isLocationValid(targetLocation):
+            if self._grid.isLocationAtLowerBorder(targetLocation) or not self._grid.isLocationValid(targetLocation):
                 cratesToRemove.append(crate)
                 continue
             if not crate.isAlive():
                 pickup: Pickup = crate.spawnPickup()
                 self._pickups.append(pickup)
-                self._grid[pickup.location[1]][pickup.location[0]] = pickup
+                self._grid.setOccupyingUnit(pickup.location, pickup)
                 cratesToRemove.append(crate)
                 crate.remove()
-                # crate.location = None
                 continue
 
-            if self.isBlocked(targetLocation):
-                targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
+            if self._grid.isBlocked(targetLocation):
+                targetUnit = self._grid.getOccupyingUnit(targetLocation)
                 if isinstance(targetUnit, Player):
                     self.addNotification("Player was hit by a crate")
                     cratesToRemove.append(crate)
@@ -249,7 +226,7 @@ class Game:
                 elif isinstance(targetUnit, Bullet):
                     crate.takeDamage(1)
                     self._bullets.remove(targetUnit)
-                    self._grid[targetLocation[1]][targetLocation[0]] = self.EMPTY_CELL_SYMBOL
+                    self._grid.setOccupyingUnit(targetLocation, self.EMPTY_CELL_SYMBOL)
                 else:
                     cratesToRemove.append(crate)
             else:
@@ -258,7 +235,7 @@ class Game:
         for crate in cratesToRemove:
             self._crates.remove(crate)
             if not crate.isRemoved:
-                self._grid[crate.location[1]][crate.location[0]] = self.EMPTY_CELL_SYMBOL
+                self._grid.setOccupyingUnit(crate.location, self.EMPTY_CELL_SYMBOL)
 
     def update(self) -> None:
         self._frameCounter += 1
@@ -280,14 +257,14 @@ class Game:
         if not self.player.canFire(): return
 
         bulletLocation = self.player.getNextLocation(Direction.UP)
-        if not self.isLocationValid(bulletLocation) or self.isBlocked(bulletLocation):
+        if not self._grid.isLocationValid(bulletLocation) or self._grid.isBlocked(bulletLocation):
             self.addNotification("Cannot fire: Path blocked", 2)
             return
 
         self.player.fire()
         bullet = Bullet(bulletLocation)
         self._bullets.append(bullet)
-        self._grid[bullet.location[1]][bullet.location[0]] = bullet
+        self._grid.setOccupyingUnit(bulletLocation, bullet)
 
     def trySpawnEnemies(self) -> None:
         if time.time() - self._lastEnemySpawnTime < self._enemySpawnInterval: return
@@ -300,27 +277,32 @@ class Game:
         count = random.randint(1, self.MAX_NUMBER_OF_ENEMIES_TO_SPAWN)
         possibleOffsets = [-7, -5, -3, -1, 0, 1, 3, 5, 7]
 
-        xPositions = []
+        locations: list[Location] = []
         for offset in possibleOffsets:
-            x = anchorX + offset
-            if self.isLocationValid((x, 1)) and not self.isBlocked((x, 1)):
-                xPositions.append(x)
-            if len(xPositions) == count: break
-        for x in xPositions:
-            enemy = Enemy((x, 1), 4)
+            x: int = anchorX + offset
+            currentLocation = Location(x, 1)
+
+            if self._grid.isLocationValid(currentLocation) and not self._grid.isBlocked(currentLocation):
+                locations.append(currentLocation)
+            if len(locations) == count: break
+
+        for location in locations:
+            enemy = Enemy(location, 4)
             self._enemies.append(enemy)
-            self._grid[1][x] = enemy
+            self._grid.setOccupyingUnit(location, enemy)
 
     def trySpawnCrate(self):
         if random.random() > 0.0025: return
 
         x = random.randint(1, self.gridSize[0] - 2)
-        if not self.isLocationValid((x, 1)) or self.isBlocked((x, 1)): return
+        targetLocation = Location(x, 1)
 
-        crate = Crate((x, 1))
+        if not self._grid.isLocationValid(targetLocation) or self._grid.isBlocked(targetLocation): return
+
+        crate = Crate(targetLocation)
         self._crates.append(crate)
-        self._grid[1][x] = crate
-    
+        self._grid.setOccupyingUnit(targetLocation, crate)
+
     def tryActivatePickup(self, pickupIndex: int) -> None:
         try:
             pickup = self.player.getItemByIndex(pickupIndex)

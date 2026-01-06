@@ -1,12 +1,13 @@
 from typing import TYPE_CHECKING
 from data.enums.entity import Entity
+from helpers.location import Location
 from units.pickups.pickup import Pickup
 
 if TYPE_CHECKING:
     from logic.game import Game
     
 class Megabomb(Pickup):
-    def __init__(self, position: tuple[int, int]):
+    def __init__(self, position: Location):
         super().__init__("Megabomb", '♦', position, Entity.MEGABOMB)
     def pick(self, game: "Game") -> None:
         try:
@@ -19,6 +20,6 @@ class Megabomb(Pickup):
         enemiesDestroyed = len(game._enemies)
         game.player.incrementScore(enemiesDestroyed * game.SCORE_INCREMENT)
         for enemy in game._enemies:
-            game._grid[enemy.location[1]][enemy.location[0]] = game.EMPTY_CELL_SYMBOL
+            game._grid[enemy.location.y][enemy.location.x] = game.EMPTY_CELL_SYMBOL
             game._enemies.clear()
         game.player.inventory.remove(self)

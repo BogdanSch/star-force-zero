@@ -10,6 +10,7 @@ from pygame.font import Font
 from pygame.time import Clock
 from data.enums.entity import Entity
 from helpers.button import Button
+from helpers.location import Location
 from helpers.textInput import TextInput
 from repositories.scoreRepository import ScoreRepository
 from data.score import Score
@@ -310,7 +311,7 @@ def main() -> None:
     displayMainMenuScreen(screen, uiImages["button"], titleFont, paragraphFont)
 
     while True:
-        player = Player(getUsername(), (10, 20), 4)
+        player = Player(getUsername(), Location(10, 20), 4)
         game = Game(player, (GAME_FIELD_SIZE, GAME_FIELD_SIZE), GAME_DURATION_IN_SECONDS)
         displayGameScreen(game, screen, objectImages, uiImages["background"], objectRects, paragraphFont)
 

@@ -1,9 +1,10 @@
 from data.enums.entity import Entity
+from helpers.location import Location
 from units.unit import Unit
 
 class Wall(Unit):
     WALL_SYMBOL: str = '■'
     WALL_NAME: str = "Wall"
 
-    def __init__(self, location: tuple = (0, 0)):
-        super().__init__(self.WALL_NAME, self.WALL_SYMBOL, Entity.WALL, location, 0)
+    def __init__(self, location: Location = Location(0, 0)):
+        super().__init__(self.WALL_NAME, self.WALL_SYMBOL, Entity.WALL, location)

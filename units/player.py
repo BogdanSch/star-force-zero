@@ -2,9 +2,9 @@ import time
 from typing import Final, TYPE_CHECKING # <--- Import TYPE_CHECKING
 from data.enums.entity import Entity
 from data.enums.direction import Direction
+from helpers.location import Location
 from units.unitWithHealth import UnitWithHealth
 
-# FIX: Only import Pickup for static analysis, not at runtime
 if TYPE_CHECKING:
     from units.pickups.pickup import Pickup
 
@@ -13,7 +13,7 @@ class Player(UnitWithHealth):
     FIRE_COOLDOWN: Final[float] = .5
     INVENTORY_MAX_SIZE: Final[int] = 10
 
-    def __init__(self, name: str, location: tuple, health: int, speed: int = 1, damage: int = 1, score: int = 0):
+    def __init__(self, name: str, location: Location, health: int, speed: int = 1, damage: int = 1, score: int = 0):
         super().__init__(name, self.PLAYER_SYMBOL, Entity.PLAYER, location, speed, health)
         self.score: int = score
         self.damage: int = damage
@@ -23,15 +23,15 @@ class Player(UnitWithHealth):
     def incrementScore(self, value: int = 1) -> None:
         self.score += value
 
-    def getNextLocation(self, direction: Direction) -> tuple:
+    def getNextLocation(self, direction: Direction) -> Location:
         if direction == Direction.UP:
-            return (self.location[0], self.location[1] - 1)
+            return Location(self.location.x, self.location.y - 1)
         elif direction == Direction.DOWN:
-            return (self.location[0], self.location[1] + 1)
+            return Location(self.location.x, self.location.y + 1)
         elif direction == Direction.LEFT:
-            return (self.location[0] - 1, self.location[1])
+            return Location(self.location.x - 1, self.location.y)
         elif direction == Direction.RIGHT:
-            return (self.location[0] + 1, self.location[1])
+            return Location(self.location.x + 1, self.location.y)
         return self.location
 
     def canFire(self) -> bool:

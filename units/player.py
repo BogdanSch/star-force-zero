@@ -1,14 +1,19 @@
 import time
-from typing import Final, TYPE_CHECKING # <--- Import TYPE_CHECKING
+from typing import Final, TYPE_CHECKING
 from data.enums.entity import Entity
 from data.enums.direction import Direction
 from helpers.location import Location
+from units.collision.disposable import Disposable
 from units.unitWithHealth import UnitWithHealth
 
 if TYPE_CHECKING:
     from units.pickups.pickup import Pickup
+    from logic.game import Game
+    from units.bullet import Bullet
+    from units.enemy import Enemy
+    from units.pickups.crate import Crate
 
-class Player(UnitWithHealth):
+class Player(UnitWithHealth, Disposable):
     PLAYER_SYMBOL: Final[str] = '▲'
     FIRE_COOLDOWN: Final[float] = .5
     INVENTORY_MAX_SIZE: Final[int] = 10
@@ -56,3 +61,29 @@ class Player(UnitWithHealth):
         if itemIndex < 1 or itemIndex > len(self.inventory):
             raise IndexError("Cannot activate this pickup.")
         return self.inventory[itemIndex - 1]
+    
+    def onHitByPlayer(self, game: 'Game') -> bool:
+        return super().onHitByPlayer(game)
+
+    def onHitByBullet(self, bullet: 'Bullet', game: 'Game') -> bool:
+        return super().onHitByBullet(bullet, game)
+    
+    def onHitByEnemy(self, enemy: 'Enemy', game: 'Game') -> bool:
+        game.addNotification("Player was hit by an enemy", 3)
+        enemy.takeDamage(1)
+        game.player.incrementScore(game.SCORE_INCREMENT)
+        
+        game.killUnit(self) 
+        if not enemy.isAlive():
+            game.killUnit(enemy)
+        return True
+    
+    def onHitByCrate(self, crate: 'Crate', game: 'Game') -> bool:
+        game.addNotification("Player rammed a crate!")
+        crate.takeDamage(1)
+        self.takeDamage(1)
+        
+        if not crate.isAlive():
+            game.killUnit(crate)
+            return True
+        return False

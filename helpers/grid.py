@@ -25,12 +25,12 @@ class Grid:
             self._grid.append(row)
     
     def isLocationValid(self, location: Location) -> bool:
-        if location.x <= 0 or location.x >= self.gridSize[0]: return False
-        elif location.y <= 0 or location.y >= self.gridSize[1]: return False
+        if location.x <= 0 or location.x >= self.gridSize[0] - 1: return False
+        elif location.y <= 0 or location.y >= self.gridSize[1] - 1: return False
         return True
     
     def isLocationAtLowerBorder(self, location: Location) -> bool:
-        return location.y == self.gridSize[1] - 1
+        return location.y >= self.gridSize[1] - 1
     
     def isBlocked(self, location: Location) -> bool:
         return self.getOccupyingUnit(location) is not None

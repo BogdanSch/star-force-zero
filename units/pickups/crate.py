@@ -1,25 +1,22 @@
 import random
+from data.enums.entity import Entity
+from units.pickups.megabomb import Megabomb
 from units.unitWithHealth import UnitWithHealth
-from units.pickups.pickup import Pickup
+from units.pickups.extraScore import ExtraScore
+from units.pickups.heart import Heart
 from data.enums.direction import Direction
-from data.enums.pickupType import PickupType
 
 class Crate(UnitWithHealth):
-    pickupSymbols: dict[PickupType, str] = {
-        PickupType.HEAL: '♥',
-        PickupType.MEGABOMB: '♦',
-        PickupType.EXTRA_SCORE: '•'
-    }
-    def __init__(self, name: str, location: tuple, speed: int = 4, health: int = 1, symbol: str = 'X'):
-        super().__init__(name, symbol, location, speed, health)
-        self.pickupType = random.choice([
-            PickupType.HEAL,
-            PickupType.MEGABOMB,
-            PickupType.EXTRA_SCORE
+    def __init__(self, location: tuple, name: str = "Crate", speed: int = 4, health: int = 1, symbol: str = 'X'):
+        super().__init__(name, symbol, Entity.CRATE, location, speed, health)
+        self.pickup = random.choice([
+            Heart,
+            ExtraScore,
+            Megabomb
         ])
         self._isRemoved = False
     def spawnPickup(self):
-        return Pickup(self.pickupType, self.pickupSymbols[self.pickupType], self.location)
+        return self.pickup(self.location)
     def getNextLocation(self, direction: Direction = Direction.DOWN) -> tuple:
         nextLocation = [self.location[0], self.location[1] + (1 if direction == Direction.DOWN else -1)]
         return tuple(nextLocation)

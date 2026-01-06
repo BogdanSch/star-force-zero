@@ -8,16 +8,16 @@ from typing import Iterator, Final
 from pygame import Surface, Rect
 from pygame.font import Font
 from pygame.time import Clock
+from data.enums.entity import Entity
 from helpers.button import Button
 from helpers.textInput import TextInput
 from repositories.scoreRepository import ScoreRepository
 from data.score import Score
 from units.player import Player
-from units.pickups.pickup import Pickup
 from logic.game import Game
 from data.enums.direction import Direction
 from helpers.timeHelper import formatTimeInSeconds
-from colors import DARK_COLOR, GREY_COLOR, LIGHT_COLOR, RED_COLOR
+from colors import DARK_COLOR, GREY_COLOR, LIGHT_COLOR, RED_COLOR, COLOR_TYPE
 
 USERNAME_FILE_PATH: Final[str] = "username.txt"
 
@@ -29,17 +29,6 @@ TOP_SCORES_LENGTH: Final[int] = 6
 
 SCREEN_WIDTH: Final[int] = 1280
 SCREEN_HEIGHT: Final[int] = 720
-
-CELL_RENDERERS = {
-    "Player": lambda screen, rect, images: screen.blit(images["player"], rect),
-    "Enemy": lambda screen, rect, images: screen.blit(images["enemy"], rect),
-    "Crate": lambda screen, rect, images: screen.blit(images["crate"], rect),
-    "Heal": lambda screen, rect, images: screen.blit(images["heart"], rect),
-    "Megabomb": lambda screen, rect, images: screen.blit(images["megabomb"], rect),
-    "Extra Score": lambda screen, rect, images: screen.blit(images["extraScore"], rect),
-    "Bullet": lambda screen, rect, images: screen.blit(images["laserBullet"], rect),
-    "Wall": lambda screen, rect, images: pygame.draw.rect(screen, GREY_COLOR, rect),
-}
 
 def displayMainMenuScreen(screen: pygame.Surface, buttonPlaceholderImage: pygame.Surface, titleFont: pygame.font.Font, paragraphFont: pygame.font.Font) -> None:
     pygame.display.set_caption("Star Force Zero - Main Menu")
@@ -75,7 +64,7 @@ def displayMainMenuScreen(screen: pygame.Surface, buttonPlaceholderImage: pygame
 def displayGameOverScreen(screen: Surface, game: Game, scoreRepository: ScoreRepository, gameImages: dict[str, Surface], titleFont: pygame.font.Font, paragraphFont: pygame.font.Font) -> bool:
     def displayTopScoresTable(topScores: list[Score], screen: Surface, paragraphFont: Font,
                               position: tuple[int, int]) -> None:
-        header = paragraphFont.render("Top 10 Scores", True, LIGHT_COLOR)
+        header = paragraphFont.render("Top 6 Scores", True, LIGHT_COLOR)
         headerRect = header.get_rect(center=(position[0], position[1]))
         screen.blit(header, headerRect)
 
@@ -180,10 +169,10 @@ def displayGameOverScreen(screen: Surface, game: Game, scoreRepository: ScoreRep
 
     return False
 
-def displayGameScreen(game, screen, images: dict[str, Surface], backgroundImage: Surface, paragraphFont):
+def displayGameScreen(game, screen, images: dict[Entity, Surface], backgroundImage: Surface, rects: dict[Entity, COLOR_TYPE], paragraphFont):
     pygame.display.set_caption("Sky Force Zero - Game")
 
-    displayGrid(screen, game.grid, images)
+    displayGrid(screen, game.grid, images, rects)
     clock: Clock = Clock()
     running: bool = True
 
@@ -207,7 +196,7 @@ def displayGameScreen(game, screen, images: dict[str, Surface], backgroundImage:
         game.update()
 
         displayGameStats(screen, game, paragraphFont)
-        displayGrid(screen, game.grid, images)
+        displayGrid(screen, game.grid, images, rects)
 
         pygame.display.flip()
         clock.tick(FRAME_RATE)
@@ -260,21 +249,19 @@ def displayGameStats(screen: Surface, game: Game, paragraphFont: Font) -> None:
 
     displayInventory(screen, game.player, paragraphFont)
 
-def displayGrid(screen: Surface, grid: Iterator[list], images: dict[str, Surface]) -> None:
+def displayGrid(screen: Surface, grid: Iterator[list], images: dict[Entity, Surface], rects: dict[Entity, COLOR_TYPE]) -> None:
     matrix = list(grid)
     for y in range(len(matrix)):
         for x in range(len(matrix[y])):
             cell = matrix[y][x]
+            if isinstance(cell, str):
+                continue
 
-            drawer = None
-            if isinstance(cell, Pickup):
-                drawer = CELL_RENDERERS.get(cell.type.value.title())
-            else:
-                drawer = CELL_RENDERERS.get(type(cell).__name__)
-
-            if drawer: 
-                rect = Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
-                drawer(screen, rect, images)
+            rect = Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+            if cell.entityType in images:
+                screen.blit(images[cell.entityType], rect)
+            elif cell.entityType in rects:
+                pygame.draw.rect(screen, rects[cell.entityType], rect)
 
 def saveUsername(name: str) -> None:
     with open(USERNAME_FILE_PATH, 'w') as f:
@@ -302,29 +289,32 @@ def main() -> None:
     paragraphFont = createFont(28)
 
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-
-    objectImages: dict[str, Surface] = {
-        "player": createImage("./assets/player-ship.png"),
-        "enemy": createImage("./assets/enemy-ship.png"),
-        "crate": createImage("./assets/crate.png"),
-        "laserBullet": createImage("./assets/laser-bullet.png"),
-        "heart": createImage("./assets/pickups/heart.png"),
-        "extraScore": createImage("./assets/pickups/pixel-star.png"),
-        "megabomb": createImage("./assets/pickups/megabomb.png"),
+    
+    objectImages: dict[Entity, Surface] = {
+        Entity.PLAYER: createImage("./assets/player-ship.png"),
+        Entity.ENEMY: createImage("./assets/enemy-ship.png"),
+        Entity.CRATE: createImage("./assets/crate.png"),
+        Entity.BULLET: createImage("./assets/laser-bullet.png"),
+        Entity.HEART: createImage("./assets/pickups/heart.png"),
+        Entity.EXTRA_SCORE: createImage("./assets/pickups/pixel-star.png"),
+        Entity.MEGABOMB: createImage("./assets/pickups/megabomb.png"),
     }
-    gameImages: dict[str, Surface] = {
+    objectRects: dict[Entity, COLOR_TYPE] = {
+        Entity.WALL: GREY_COLOR
+    }
+    uiImages: dict[str, Surface] = {
         "input": createImage("./assets/input-placeholder.png", (320, 180)),
         "button": createImage("./assets/button-placeholder.png", (280, 160)),
         "background": createImage("./assets/backgrounds/bg1.gif", (GAME_FIELD_SIZE * CELL_SIZE, GAME_FIELD_SIZE * CELL_SIZE))
     }
-    displayMainMenuScreen(screen, gameImages["button"], titleFont, paragraphFont)
+    displayMainMenuScreen(screen, uiImages["button"], titleFont, paragraphFont)
 
     while True:
         player = Player(getUsername(), (10, 20), 4)
         game = Game(player, (GAME_FIELD_SIZE, GAME_FIELD_SIZE), GAME_DURATION_IN_SECONDS)
-        displayGameScreen(game, screen, objectImages, gameImages["background"], paragraphFont)
+        displayGameScreen(game, screen, objectImages, uiImages["background"], objectRects, paragraphFont)
 
-        isGameContinued = displayGameOverScreen(screen, game, scoreRepository, gameImages, titleFont, paragraphFont)
+        isGameContinued = displayGameOverScreen(screen, game, scoreRepository, uiImages, titleFont, paragraphFont)
         if not isGameContinued: break
 
     pygame.quit()

@@ -12,7 +12,6 @@ from units.enemy import Enemy
 from units.bullet import Bullet
 from units.pickups.crate import Crate
 from units.pickups.pickup import Pickup
-from data.enums.pickupType import PickupType
 from data.enums.direction import Direction
 
 class Game:
@@ -72,7 +71,11 @@ class Game:
 
     @property
     def notifications(self) -> list[str]:
-        return [n["text"] for n in self._notifications if n["expiresAt"] > time.time()]
+        return [
+            n["text"] 
+            for n in self._notifications 
+            if n["expiresAt"] > time.time()
+        ]
 
     def getTimeLeft(self) -> float:
         return self.startTime + self.gameDurationInSeconds - time.time()
@@ -130,6 +133,7 @@ class Game:
             if self.isBlocked(targetLocation):
                 targetUnit = self._grid[targetLocation[1]][targetLocation[0]]
                 
+                # Replace with entity
                 if targetUnit and isinstance(targetUnit, Player):
                     self.addNotification("Player was hit by an enemy", 3)
                     enemiesToRemove.append(enemy)
@@ -157,21 +161,10 @@ class Game:
     def handlePickupCollection(self, pickup: Pickup) -> None:
         self._pickups.remove(pickup)
         if self.player.isInventoryFull():
-            self.addNotification(f"Can't add {pickup.type.value}. The inventory is full.")
+            self.addNotification(f"Can't add {pickup.name}. The inventory is full.")
             return
 
-
-        match pickup.type:
-            case PickupType.HEAL:
-                self.player.heal(1)
-            case PickupType.EXTRA_SCORE:
-                self.player.incrementScore(self.EXTRA_SCORE_INCREMENT)
-            case _:
-                try:
-                    self.player.addItem(pickup)
-                    self.addNotification(f"Picked up {pickup.type.value}")
-                except RuntimeError as e:
-                    self.addNotification(str(e))
+        pickup.pick(self)
 
         self._updateUnitPosition(self.player, pickup.location)
 
@@ -314,7 +307,7 @@ class Game:
                 xPositions.append(x)
             if len(xPositions) == count: break
         for x in xPositions:
-            enemy = Enemy("Normal", (x, 1), 4)
+            enemy = Enemy((x, 1), 4)
             self._enemies.append(enemy)
             self._grid[1][x] = enemy
 
@@ -324,7 +317,7 @@ class Game:
         x = random.randint(1, self.gridSize[0] - 2)
         if not self.isLocationValid((x, 1)) or self.isBlocked((x, 1)): return
 
-        crate = Crate("Crate", (x, 1))
+        crate = Crate((x, 1))
         self._crates.append(crate)
         self._grid[1][x] = crate
     
@@ -335,17 +328,7 @@ class Game:
             self.addNotification(str(e))
             return
 
-        match pickup.type:
-            case PickupType.MEGABOMB:
-                self.addNotification("Megabomb activated!")
-                enemiesDestroyed = len(self._enemies)
-                self.player.incrementScore(enemiesDestroyed * self.SCORE_INCREMENT)
-                for enemy in self._enemies:
-                    self._grid[enemy.location[1]][enemy.location[0]] = self.EMPTY_CELL_SYMBOL
-                self._enemies.clear()
-                self.player.inventory.remove(pickup)
-            case _:
-                self.addNotification(f"Cannot activate {pickup.type.value}")
+        pickup.activate(self)
 
     def getScore(self) -> Score:
         return Score(self.player.name, self.player.score, datetime.datetime.now().isoformat())
